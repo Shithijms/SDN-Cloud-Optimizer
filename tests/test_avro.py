@@ -254,6 +254,127 @@ def test_exploration_diversity():
         f"Exploration should be stochastic — got same result every time"
     )
 
+def test_select_vm_returns_valid_index():
+    """select_vm must return a valid VM index"""
+    scheduler = AVROScheduler()
+    result    = scheduler.select_vm(VM_STATS)
+
+    print(f"  Selected VM: {result}")
+    assert isinstance(result, int), f"Expected int, got {type(result)}"
+    assert 0 <= result < len(VM_STATS), (
+        f"VM index {result} out of range [0, {len(VM_STATS)})"
+    )
+
+
+def test_select_vm_avoids_overloaded():
+    """
+    Over many runs, AVRO should rarely or never select VM0 (overloaded).
+    VM0 has fitness 0.071 vs VM3 fitness 0.747.
+    """
+    scheduler  = AVROScheduler(pop_size=10, max_iter=100)
+    selections = [scheduler.select_vm(VM_STATS) for _ in range(50)]
+
+    counts = {i: selections.count(i) for i in range(len(VM_STATS))}
+    print(f"  Selections over 50 runs: {counts}")
+
+    vm0_pct = counts[0] / 50 * 100
+    vm3_pct = counts[3] / 50 * 100
+    print(f"  VM0 (overloaded) selected: {vm0_pct:.1f}%")
+    print(f"  VM3 (best)       selected: {vm3_pct:.1f}%")
+
+    assert counts[3] > counts[0], (
+        f"VM3 (best) should be selected more than VM0 (overloaded). "
+        f"VM3={counts[3]}, VM0={counts[0]}"
+    )
+
+
+def test_select_vm_single_vm():
+    """With only one VM, must select index 0"""
+    scheduler = AVROScheduler()
+    single_vm = [{'cpu': 0.5, 'memory': 0.5, 'queue_length': 2, 'delay': 10.0}]
+    result    = scheduler.select_vm(single_vm)
+
+    print(f"  Single VM result: {result}")
+    assert result == 0
+
+
+def test_select_vm_empty_raises():
+    """Empty VM list should raise ValueError"""
+    scheduler = AVROScheduler()
+    try:
+        scheduler.select_vm([])
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        print(f"  Correctly raised ValueError: {e}")
+
+
+def test_convergence_tracking_shape():
+    """Convergence history should have max_iter entries"""
+    scheduler = AVROScheduler(max_iter=100)
+    result, history = scheduler.select_vm(VM_STATS, track_convergence=True)
+
+    print(f"  Selected VM: {result}")
+    print(f"  History length: {len(history)}")
+    print(f"  First fitness: {history[0]:.4f}")
+    print(f"  Final fitness: {history[-1]:.4f}")
+
+    assert len(history) == 100, (
+        f"Expected 100 history entries, got {len(history)}"
+    )
+
+
+def test_convergence_is_nondecreasing():
+    """
+    Best fitness tracked over iterations should never decrease.
+    We track the BEST seen so far, so it can only stay same or improve.
+    """
+    scheduler = AVROScheduler(max_iter=100)
+    _, history = scheduler.select_vm(VM_STATS, track_convergence=True)
+
+    violations = [
+        i for i in range(1, len(history))
+        if history[i] < history[i-1] - 1e-9
+    ]
+
+    print(f"  Convergence violations (decreases): {len(violations)}")
+    print(f"  Start: {history[0]:.4f} → End: {history[-1]:.4f}")
+
+    assert len(violations) == 0, (
+        f"Convergence history decreased at iterations: {violations}"
+    )
+
+
+def test_avro_beats_random_selection():
+    """
+    AVRO average fitness should beat random VM selection
+    over many independent runs.
+    """
+    from src.scheduler.fitness import compute_fitness
+
+    scheduler    = AVROScheduler(pop_size=10, max_iter=100)
+    num_runs     = 30
+
+    avro_fitness   = []
+    random_fitness = []
+
+    for _ in range(num_runs):
+        avro_vm   = scheduler.select_vm(VM_STATS)
+        random_vm = np.random.randint(0, len(VM_STATS))
+
+        avro_fitness.append(compute_fitness(VM_STATS[avro_vm]))
+        random_fitness.append(compute_fitness(VM_STATS[random_vm]))
+
+    avg_avro   = sum(avro_fitness)   / num_runs
+    avg_random = sum(random_fitness) / num_runs
+
+    print(f"  AVRO avg fitness:   {avg_avro:.4f}")
+    print(f"  Random avg fitness: {avg_random:.4f}")
+    print(f"  Improvement: {((avg_avro - avg_random) / avg_random * 100):.1f}%")
+
+    assert avg_avro > avg_random, (
+        f"AVRO ({avg_avro:.4f}) should beat random ({avg_random:.4f})"
+    )
+
 def run_all_tests():
     tests = [
         test_population_shape,
@@ -270,6 +391,13 @@ def run_all_tests():
         test_levy_flight_nonzero,
         test_exploration_moves_population,
         test_exploration_diversity,
+        test_select_vm_returns_valid_index,
+        test_select_vm_avoids_overloaded,
+        test_select_vm_single_vm,
+        test_select_vm_empty_raises,
+        test_convergence_tracking_shape,
+        test_convergence_is_nondecreasing,
+        test_avro_beats_random_selection,
     ]
 
     passed = 0

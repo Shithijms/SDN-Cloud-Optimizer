@@ -320,4 +320,86 @@ class AVROScheduler:
             new_pop[j] = int(np.clip(round(new_val), 0, num_vms - 1))
 
         return new_pop
+
+    # ────────────────────────────────────────────────────────────
+    # STAGE 3 — Full Optimization Loop
+    # ────────────────────────────────────────────────────────────
+
+    def select_vm(self,
+                  vm_stats_list: list,
+                  track_convergence: bool = False):
+        """
+        Main entry point — runs full AVRO optimization loop.
+
+        Iterates through exploration, development, and optimization
+        stages to find the best VM for an incoming task.
+
+        Parameters
+        ----------
+        vm_stats_list    : list of dicts — real-time stats per VM
+        track_convergence: bool — if True, returns convergence history
+                           for plotting (used in evaluation/report)
+
+        Returns
+        -------
+        If track_convergence is False:
+            int — index of best VM selected
+
+        If track_convergence is True:
+            tuple: (int, list)
+                int  — index of best VM selected
+                list — best fitness score at each iteration
+        """
+        num_vms = len(vm_stats_list)
+
+        if num_vms == 0:
+            raise ValueError("vm_stats_list cannot be empty")
+        if num_vms == 1:
+            return (0, []) if track_convergence else 0
+
+        # Step 1 — Initialize population
+        population     = self.initialize_population(num_vms)
+        fitness_scores = self.compute_population_fitness(
+            population, vm_stats_list)
+
+        convergence_history = []
+        best_vm_overall     = int(population[np.argmax(fitness_scores)])
+        best_fitness_overall = np.max(fitness_scores)
+
+        # Step 2 — Iterate
+        for i in range(self.max_iter):
+
+            # Step 2a — Select leader vulture
+            leader_vm = self.select_leader(population, fitness_scores)
+
+            # Step 2b — Compute satiety F
+            F = self.compute_satiety(i)
+
+            # Step 2c — Update population based on |F|
+            if abs(F) >= 1:
+                population = self._exploration(
+                    population, leader_vm, F, num_vms)
+            else:
+                population = self._development(
+                    population, leader_vm, F, num_vms, fitness_scores)
+
+            # Step 2d — Recompute fitness after update
+            fitness_scores = self.compute_population_fitness(
+                population, vm_stats_list)
+
+            # Step 2e — Track best solution found so far
+            current_best_fitness = np.max(fitness_scores)
+            current_best_vm      = int(
+                population[np.argmax(fitness_scores)])
+
+            if current_best_fitness > best_fitness_overall:
+                best_fitness_overall = current_best_fitness
+                best_vm_overall      = current_best_vm
+
+            if track_convergence:
+                convergence_history.append(round(best_fitness_overall, 6))
+
+        if track_convergence:
+            return best_vm_overall, convergence_history
+        return best_vm_overall
     
