@@ -167,3 +167,157 @@ class AVROScheduler:
 
         return F
     
+    # ────────────────────────────────────────────────────────────
+    # STAGE 2A — Exploration (|F| >= 1)
+    # ────────────────────────────────────────────────────────────
+
+    def _exploration(self,
+                     population: np.ndarray,
+                     leader_vm: int,
+                     F: float,
+                     num_vms: int) -> np.ndarray:
+        """
+        Equations 18-21 from paper — exploration stage.
+
+        Triggered when |F| >= 1 (vulture is well-fed, searches widely).
+        Two strategies selected by random vs G1:
+          - Eq 19: forage around leader with exploration distance
+          - Eq 21: random position within search bounds
+
+        Parameters
+        ----------
+        population : np.ndarray — current VM indices
+        leader_vm  : int        — VM index of leader vulture
+        F          : float      — satiety value
+        num_vms    : int        — total number of VMs
+
+        Returns
+        -------
+        np.ndarray — updated population
+        """
+        new_pop = population.copy()
+
+        for j in range(len(population)):
+            rG1 = np.random.random()
+
+            if rG1 >= G1:
+                # Equation 19 — forage around leader
+                X   = 2 * np.random.random()
+                D_i = abs(X * leader_vm - population[j])        # Eq 20
+                new_val = leader_vm - D_i * F
+            else:
+                # Equation 21 — random position in search space
+                r3 = np.random.random()
+                r4 = np.random.random()
+                lb, ub = 0, num_vms - 1
+                new_val = leader_vm - F + r3 * ((ub - lb) * r4 + lb)
+
+            new_pop[j] = int(np.clip(round(new_val), 0, num_vms - 1))
+
+        return new_pop
+
+    # ────────────────────────────────────────────────────────────
+    # STAGE 2B — Development (|F| < 1)
+    # ────────────────────────────────────────────────────────────
+
+    def _levy_flight(self, beta: float = 1.5) -> float:
+        """
+        Equations 33-34 from paper — Levy flight model.
+        Simulates the vulture's erratic flight pattern during
+        aggressive food competition.
+        """
+        sigma = (
+            math.gamma(1 + beta) *
+            math.sin(math.pi * beta / 2) /
+            (math.gamma((1 + beta) / 2) * beta * 2 ** ((beta - 1) / 2))
+        ) ** (1 / beta)
+
+        u = np.random.normal(0, sigma)
+        v = np.random.normal(0, 1)
+        lf = 0.01 * u / (abs(v) ** (1 / beta) + 1e-10)
+        return lf
+
+    def _development(self,
+                     population: np.ndarray,
+                     leader_vm: int,
+                     F: float,
+                     num_vms: int,
+                     fitness_scores: np.ndarray) -> np.ndarray:
+        """
+        Equations 22-32 from paper — development stage.
+
+        Triggered when |F| < 1 (vulture is hungry, refines near leader).
+        Two sub-stages based on |F| value:
+
+        Stage One (|F| in [0.5, 1)):
+          - Food competition (Eq 23) or rotating flight (Eq 27)
+
+        Stage Two (|F| < 0.5):
+          - Vulture convergence (Eq 31) or Levy flight competition (Eq 32)
+
+        Parameters
+        ----------
+        population     : np.ndarray — current VM indices
+        leader_vm      : int        — VM index of leader
+        F              : float      — satiety value
+        num_vms        : int        — total VMs available
+        fitness_scores : np.ndarray — current fitness of each member
+
+        Returns
+        -------
+        np.ndarray — updated population
+        """
+        new_pop = population.copy()
+        sorted_idx = np.argsort(fitness_scores)[::-1]
+
+        # Best1 and Best2 VM indices for convergence equations
+        best1_vm = int(population[sorted_idx[0]])
+        best2_vm = int(population[sorted_idx[1]]) if len(sorted_idx) > 1 else best1_vm
+
+        for j in range(len(population)):
+            abs_F = abs(F)
+
+            if abs_F >= 0.5:
+                # ── Development Stage One ──────────────────────
+                rG2 = np.random.random()
+
+                if rG2 >= G2:
+                    # Food competition — Equation 23
+                    r5    = np.random.random()
+                    d_t   = leader_vm - population[j]           # Eq 24
+                    new_val = abs_F * (F + r5) - d_t
+
+                else:
+                    # Rotating flight — Equations 25, 26, 27
+                    r6 = np.random.random()
+                    r7 = np.random.random()
+                    p  = population[j] + 1e-10                  # avoid div by zero
+
+                    S1 = leader_vm * (r6 * p / (2 * math.pi)) * math.cos(p)
+                    S2 = leader_vm * (r7 * p / (2 * math.pi)) * math.sin(p)
+                    new_val = leader_vm - (S1 + S2)
+
+            else:
+                # ── Development Stage Two ──────────────────────
+                rG3 = np.random.random()
+
+                if rG3 >= G3:
+                    # Vulture convergence — Equations 29, 30, 31
+                    denom1 = (best1_vm - population[j] ** 2) + 1e-10
+                    denom2 = (best2_vm - population[j] ** 2) + 1e-10
+
+                    A1 = best1_vm - (best1_vm * population[j]) / denom1 * F
+                    A2 = best2_vm - (best2_vm * population[j]) / denom2 * F
+
+                    new_val = (A1 + A2) / 2                     # Eq 31
+
+                else:
+                    # Levy flight food competition — Equation 32
+                    d_t   = leader_vm - population[j]
+                    lf    = self._levy_flight()
+                    new_val = leader_vm - abs(d_t) * F * lf
+
+            new_pop[j] = int(np.clip(round(new_val), 0, num_vms - 1))
+
+        return new_pop
+    

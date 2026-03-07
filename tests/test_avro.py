@@ -155,6 +155,104 @@ def test_exploration_triggered_when_f_large():
         f"only got {large_f_count}/100"
     )
 
+def test_exploration_returns_valid_indices():
+    """All exploration outputs must be valid VM indices"""
+    scheduler = AVROScheduler(pop_size=10)
+    num_vms = 4
+    pop     = scheduler.initialize_population(num_vms)
+    fitness = scheduler.compute_population_fitness(pop, VM_STATS)
+    leader  = scheduler.select_leader(pop, fitness)
+
+    # Force large F to trigger exploration
+    F = 1.5
+    new_pop = scheduler._exploration(pop, leader, F, num_vms)
+
+    print(f"  Original pop: {pop}")
+    print(f"  After exploration: {new_pop}")
+
+    assert new_pop.shape == pop.shape
+    assert new_pop.min() >= 0
+    assert new_pop.max() < num_vms
+
+
+def test_development_returns_valid_indices():
+    """All development outputs must be valid VM indices"""
+    scheduler = AVROScheduler(pop_size=10)
+    num_vms = 4
+    pop     = scheduler.initialize_population(num_vms)
+    fitness = scheduler.compute_population_fitness(pop, VM_STATS)
+    leader  = scheduler.select_leader(pop, fitness)
+
+    # Force small F to trigger development
+    F = 0.3
+    new_pop = scheduler._development(pop, leader, F, num_vms, fitness)
+
+    print(f"  Original pop: {pop}")
+    print(f"  After development: {new_pop}")
+
+    assert new_pop.shape == pop.shape
+    assert new_pop.min() >= 0
+    assert new_pop.max() < num_vms
+
+
+def test_levy_flight_nonzero():
+    """Levy flight should return nonzero values"""
+    scheduler = AVROScheduler()
+    values = [scheduler._levy_flight() for _ in range(100)]
+    nonzero = sum(1 for v in values if abs(v) > 1e-10)
+
+    print(f"  Nonzero Levy values: {nonzero}/100")
+    assert nonzero > 90
+
+
+def test_exploration_moves_population():
+    """Exploration should change at least some population members"""
+    scheduler = AVROScheduler(pop_size=10)
+    num_vms   = 4
+
+    # Realistic starting population — not all same index
+    # All pointing to worst VM (VM0), leader should push toward VM3
+    pop     = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    fitness = scheduler.compute_population_fitness(pop, VM_STATS)
+
+    # Manually set leader to VM3 (best VM) to force movement
+    leader = 3
+    F      = 1.5
+
+    new_pop = scheduler._exploration(pop, leader, F, num_vms)
+
+    changed = np.sum(new_pop != pop)
+    print(f"  Members changed: {changed}/10")
+    print(f"  Before: {pop}")
+    print(f"  After:  {new_pop}")
+    print(f"  Leader was: VM{leader} (best VM)")
+
+    assert changed > 0, (
+        f"With leader=VM3 and population all at VM0, "
+        f"exploration should produce movement"
+    )
+
+def test_exploration_diversity():
+    """
+    Exploration should produce diverse outputs over many runs.
+    Running 20 times from same start should not always give same result.
+    """
+    scheduler = AVROScheduler(pop_size=10)
+    num_vms   = 4
+    pop       = np.array([0, 1, 2, 3, 0, 1, 2, 3, 0, 1])
+    fitness   = scheduler.compute_population_fitness(pop, VM_STATS)
+    leader    = scheduler.select_leader(pop, fitness)
+
+    results = set()
+    for _ in range(20):
+        F       = 1.5
+        new_pop = scheduler._exploration(pop, leader, F, num_vms)
+        results.add(tuple(new_pop))
+
+    print(f"  Unique population outcomes in 20 runs: {len(results)}")
+    assert len(results) > 1, (
+        f"Exploration should be stochastic — got same result every time"
+    )
 
 def run_all_tests():
     tests = [
@@ -167,6 +265,11 @@ def run_all_tests():
         test_satiety_range_before_optimization,
         test_satiety_clipped_after_optimization,
         test_exploration_triggered_when_f_large,
+        test_exploration_returns_valid_indices,
+        test_development_returns_valid_indices,
+        test_levy_flight_nonzero,
+        test_exploration_moves_population,
+        test_exploration_diversity,
     ]
 
     passed = 0
