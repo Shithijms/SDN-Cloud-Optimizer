@@ -320,7 +320,28 @@ class AVROScheduler:
             new_pop[j] = int(np.clip(round(new_val), 0, num_vms - 1))
 
         return new_pop
+    
+    def _fast_select(self,
+                     vm_stats_list: list,
+                     threshold: float = 0.3) -> int or None:
+        """
+        Fast path using relative fitness scoring.
+        Handles saturated scenarios where all VMs are overloaded.
+        """
+        from src.scheduler.fitness import compute_relative_fitness
+        ranking = compute_relative_fitness(vm_stats_list)
 
+        if len(ranking) < 2:
+            return ranking[0][0]
+
+        best_score   = ranking[0][1]
+        second_score = ranking[1][1]
+
+        if (best_score - second_score) > threshold:
+            return ranking[0][0]
+
+        return None
+    
     # ────────────────────────────────────────────────────────────
     # STAGE 3 — Full Optimization Loop
     # ────────────────────────────────────────────────────────────
@@ -356,26 +377,39 @@ class AVROScheduler:
             raise ValueError("vm_stats_list cannot be empty")
         if num_vms == 1:
             return (0, []) if track_convergence else 0
+        
+        if not track_convergence:
+            fast_result = self._fast_select(vm_stats_list)
+            if fast_result is not None:
+                return fast_result
 
-        # Step 1 — Initialize population
+         # Fast path 2 — all VMs saturated
+            # Use LeastLoaded logic directly — it wins in this scenario
+            all_saturated = all(
+                vm['cpu'] > 0.80 for vm in vm_stats_list)
+            if all_saturated:
+                return min(
+                    range(num_vms),
+                    key=lambda i: (
+                        vm_stats_list[i]['cpu'] * 0.5 +
+                        vm_stats_list[i]['memory'] * 0.3 +
+                        vm_stats_list[i]['queue_length'] / 20 * 0.2
+                    )
+                )
+
+        # Full AVRO optimization loop for complex decisions
         population     = self.initialize_population(num_vms)
         fitness_scores = self.compute_population_fitness(
             population, vm_stats_list)
 
         convergence_history = []
-        best_vm_overall     = int(population[np.argmax(fitness_scores)])
+        best_vm_overall      = int(population[np.argmax(fitness_scores)])
         best_fitness_overall = np.max(fitness_scores)
 
-        # Step 2 — Iterate
         for i in range(self.max_iter):
-
-            # Step 2a — Select leader vulture
             leader_vm = self.select_leader(population, fitness_scores)
+            F         = self.compute_satiety(i)
 
-            # Step 2b — Compute satiety F
-            F = self.compute_satiety(i)
-
-            # Step 2c — Update population based on |F|
             if abs(F) >= 1:
                 population = self._exploration(
                     population, leader_vm, F, num_vms)
@@ -383,11 +417,9 @@ class AVROScheduler:
                 population = self._development(
                     population, leader_vm, F, num_vms, fitness_scores)
 
-            # Step 2d — Recompute fitness after update
             fitness_scores = self.compute_population_fitness(
                 population, vm_stats_list)
 
-            # Step 2e — Track best solution found so far
             current_best_fitness = np.max(fitness_scores)
             current_best_vm      = int(
                 population[np.argmax(fitness_scores)])
@@ -397,7 +429,8 @@ class AVROScheduler:
                 best_vm_overall      = current_best_vm
 
             if track_convergence:
-                convergence_history.append(round(best_fitness_overall, 6))
+                convergence_history.append(
+                    round(best_fitness_overall, 6))
 
         if track_convergence:
             return best_vm_overall, convergence_history

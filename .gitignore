@@ -1,2 +1,3 @@
 .venv
 src/scheduler/__pycache__/*
+project_dump.txt

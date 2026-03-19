@@ -71,3 +71,38 @@ def rank_vms(vm_stats_list: list) -> list:
         for idx, vm in enumerate(vm_stats_list)
     ]
     return sorted(scored, key=lambda x: x[1], reverse=True)
+
+def compute_relative_fitness(vm_stats_list: list) -> list:
+    """
+    Compute fitness scores relative to the current pool.
+
+    When all VMs are overloaded, absolute fitness scores are all
+    near zero and AVRO can't differentiate. Relative scoring
+    finds the least-bad option even in saturated conditions.
+
+    Returns list of (vm_index, relative_fitness) sorted best first.
+    """
+    raw_scores = [
+        (i, compute_fitness(vm))
+        for i, vm in enumerate(vm_stats_list)
+    ]
+
+    scores_only = [s for _, s in raw_scores]
+    min_s = min(scores_only)
+    max_s = max(scores_only)
+    score_range = max_s - min_s
+
+    if score_range < 0.01:
+        # All VMs nearly identical — use CPU as tiebreaker
+        return sorted(
+            [(i, 1.0 - vm['cpu']) for i, vm in enumerate(vm_stats_list)],
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+    # Normalize to [0, 1] within current pool
+    normalized = [
+        (i, (s - min_s) / score_range)
+        for i, s in raw_scores
+    ]
+    return sorted(normalized, key=lambda x: x[1], reverse=True)
