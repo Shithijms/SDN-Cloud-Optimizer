@@ -10,9 +10,9 @@ Usage:
 import time
 import sys
 import os
-sys.path.insert(0, os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..')))
-from src.monitor.resource_monitor import ResourceMonitor
+sys.path.insert(0, os.path.dirname(__file__))
+
+from resource_monitor import ResourceMonitor
 
 def test_basic_stats():
     print("=" * 50)
@@ -76,19 +76,26 @@ def test_background_polling():
     print("✓ Test 3 PASSED\n")
 
 def test_csv_export():
+    print("=" * 50)
+    print("TEST 4: CSV export")
+    print("=" * 50)
     monitor = ResourceMonitor(simulated=True)
+
+    # Generate some history
     for _ in range(5):
         monitor.get_all_vm_stats()
         time.sleep(0.1)
 
-    # Use absolute path from project root
-    root     = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..'))
-    csv_path = os.path.join(root, 'results', 'test_monitoring_log.csv')
+    monitor.save_to_csv('results/test_monitoring_log.csv')
+    assert os.path.exists('results/test_monitoring_log.csv'), "CSV file not created"
 
-    monitor.save_to_csv(csv_path)
-    assert os.path.exists(csv_path), "CSV file not created"
-    
+    import csv
+    with open('results/test_monitoring_log.csv') as f:
+        rows = list(csv.DictReader(f))
+    print(f"CSV contains {len(rows)} rows")
+    print(f"Columns: {list(rows[0].keys())}")
+    assert len(rows) == 5 * 4, f"Should have 20 rows (5 snapshots × 4 VMs), got {len(rows)}"
+    print("✓ Test 4 PASSED\n")
 
 def test_live_monitoring_demo():
     print("=" * 50)

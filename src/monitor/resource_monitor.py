@@ -104,14 +104,12 @@ class ResourceMonitor:
         with self._lock:
             return list(self._latest_stats)
 
-    def save_to_csv(self, filepath=None):
-        if filepath is None:
-            root     = os.path.abspath(
-                os.path.join(os.path.dirname(__file__), '..', '..'))
-            filepath = os.path.join(root, 'results', 'monitoring_log.csv')
-
-        os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
-
+    def save_to_csv(self, filepath='results/monitoring_log.csv'):
+        """
+        Exports all collected stats to CSV.
+        Member 4 (Evaluation) uses this for graphs and analysis.
+        """
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         rows = []
         for snapshot in self.history:
             for vm in snapshot['vms']:
@@ -128,7 +126,6 @@ class ResourceMonitor:
             writer.writeheader()
             writer.writerows(rows)
         print(f"[Monitor] Saved {len(rows)} records to {filepath}")
-
 
     def print_stats_table(self, stats):
         """Pretty-print a stats snapshot to terminal."""
