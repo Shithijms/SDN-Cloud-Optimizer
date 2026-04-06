@@ -1,0 +1,54 @@
+[
+    {
+        "tasks": 10,
+        "rr_response": 3.0,
+        "proposed_response": 2.4,
+        "rr_throughput": 0.7142857142857143,
+        "proposed_throughput": 0.7692307692307693,
+        "rr_makespan": 14,
+        "proposed_makespan": 13.0,
+        "rr_delay": 1.5,
+        "proposed_delay": 0.96,
+        "rr_utilization": 70,
+        "proposed_utilization": 85
+    },
+    {
+        "tasks": 50,
+        "rr_response": 3.0,
+        "proposed_response": 2.4,
+        "rr_throughput": 0.9259259259259259,
+        "proposed_throughput": 0.9433962264150944,
+        "rr_makespan": 54,
+        "proposed_makespan": 53.0,
+        "rr_delay": 1.5,
+        "proposed_delay": 0.96,
+        "rr_utilization": 70,
+        "proposed_utilization": 85
+    },
+    {
+        "tasks": 100,
+        "rr_response": 3.0,
+        "proposed_response": 2.4,
+        "rr_throughput": 0.9615384615384616,
+        "proposed_throughput": 0.970873786407767,
+        "rr_makespan": 104,
+        "proposed_makespan": 103.0,
+        "rr_delay": 1.5,
+        "proposed_delay": 0.96,
+        "rr_utilization": 70,
+        "proposed_utilization": 85
+    },
+    {
+        "tasks": 200,
+        "rr_response": 3.0,
+        "proposed_response": 2.4,
+        "rr_throughput": 0.9803921568627451,
+        "proposed_throughput": 0.9852216748768473,
+        "rr_makespan": 204,
+        "proposed_makespan": 203.0,
+        "rr_delay": 1.5,
+        "proposed_delay": 0.96,
+        "rr_utilization": 70,
+        "proposed_utilization": 85
+    }
+]
