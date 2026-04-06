@@ -1,0 +1,18 @@
+# Core SDN Controller
+ryu==4.34
+
+# Networking & Utilities
+networkx==3.1
+
+# Data Handling
+numpy==1.26.4
+pandas==2.2.2
+
+# Visualization (for Python graphs if needed)
+matplotlib==3.8.4
+
+# YAML Config Support
+PyYAML==6.0.1
+
+# Logging / Utilities
+psutil==5.9.8
