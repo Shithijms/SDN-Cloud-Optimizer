@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cloud SDN Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #050a12;
+    --panel:    #0b1624;
+    --border:   #1a3a5c;
+    --accent:   #00d4ff;
+    --accent2:  #00ff9d;
+    --warn:     #ff6b35;
+    --dim:      #3a5a7a;
+    --text:     #c8e0f0;
+    --textdim:  #5a8aaa;
+    --tenantA:  #00d4ff;
+    --tenantB:  #b060ff;
+    --ok:       #00ff9d;
+    --danger:   #ff3366;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; padding: 16px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px; margin-bottom: 20px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 38px; height: 38px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 16px rgba(0,212,255,0.3);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 16px rgba(0,212,255,0.3); }
+    50%      { box-shadow: 0 0 30px rgba(0,212,255,0.7); }
+  }
+  h1 { font-size: 20px; font-weight: 800; letter-spacing: 2px; color: var(--accent); }
+  .subtitle { font-size: 11px; color: var(--textdim); font-family: 'Share Tech Mono', monospace; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; color: var(--ok);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ok);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  .dot.dead { background: var(--danger); animation: none; }
+
+  /* ── Top KPI bar ── */
+  .kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative; overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .kpi-label { font-size: 10px; color: var(--textdim); text-transform: uppercase; letter-spacing: 1px; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: var(--accent); margin-top: 4px; font-family: 'Share Tech Mono', monospace; }
+  .kpi-sub   { font-size: 10px; color: var(--textdim); margin-top: 2px; }
+  .kpi.warn .kpi-value { color: var(--warn); }
+  .kpi.ok   .kpi-value { color: var(--ok); }
+  .kpi.danger .kpi-value { color: var(--danger); }
+
+  /* ── Layout ── */
+  .grid-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--accent);
+  }
+  .panel-head span { color: var(--textdim); font-weight: 400; font-family: 'Share Tech Mono', monospace; }
+  .panel-body { padding: 14px; }
+
+  /* ── Host cards ── */
+  .host-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .host-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    position: relative;
+  }
+  .host-card.tenantA { border-left: 3px solid var(--tenantA); }
+  .host-card.tenantB { border-left: 3px solid var(--tenantB); }
+  .host-name { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .host-ip   { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--textdim); margin-bottom: 8px; }
+  .bar-row   { margin-bottom: 5px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--textdim); margin-bottom: 3px; }
+  .bar-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .bar-fill  {
+    height: 100%; border-radius: 3px;
+    transition: width 0.6s ease;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .bar-fill.high { background: linear-gradient(90deg, var(--warn), var(--danger)); }
+  .net-row {
+    display: flex; gap: 8px; margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--textdim);
+  }
+  .badge {
+    padding: 1px 6px; border-radius: 10px; font-size: 9px;
+    background: rgba(0,212,255,0.1); color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .badge.b { background: rgba(176,96,255,0.1); color: var(--tenantB); }
+
+  /* ── Flow table ── */
+  .flow-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .flow-table th {
+    text-align: left; padding: 6px 8px;
+    color: var(--textdim); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .flow-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(26,58,92,0.4);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+  .flow-table tr:hover td { background: rgba(0,212,255,0.04); }
+
+  /* ── Blocked log ── */
+  .log-list { max-height: 220px; overflow-y: auto; }
+  .log-item {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 6px 0; border-bottom: 1px solid rgba(26,58,92,0.3);
+    font-size: 10px;
+  }
+  .log-time { color: var(--textdim); font-family: 'Share Tech Mono', monospace; white-space: nowrap; }
+  .log-rule { color: var(--warn); font-weight: 600; }
+  .log-ips  { color: var(--textdim); font-family: 'Share Tech Mono', monospace; }
+
+  /* ── Port stats ── */
+  .port-list { max-height: 220px; overflow-y: auto; }
+  .port-item {
+    padding: 7px 0; border-bottom: 1px solid rgba(26,58,92,0.3);
+    font-size: 10px;
+  }
+  .port-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .port-name { color: var(--accent); font-family: 'Share Tech Mono', monospace; }
+  .port-nums { display: flex; gap: 16px; color: var(--textdim); font-family: 'Share Tech Mono', monospace; }
+
+  /* ── Topology map ── */
+  #topo-canvas { width: 100%; }
+
+  /* ── Error ── */
+  .err { color: var(--warn); font-family: 'Share Tech Mono', monospace; font-size: 11px; padding: 8px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">☁</div>
+      <div>
+        <h1>CLOUD SDN MONITOR</h1>
+        <div class="subtitle">Ryu Controller · OpenFlow 1.3 · Multi-Tenant</div>
+      </div>
+    </div>
+    <div class="live-badge">
+      <div class="dot" id="live-dot"></div>
+      <span id="live-text">CONNECTING...</span>
+    </div>
+  </header>
+
+  <!-- KPI Bar -->
+  <div class="kpi-bar">
+    <div class="kpi">
+      <div class="kpi-label">Switches</div>
+      <div class="kpi-value" id="kpi-switches">—</div>
+      <div class="kpi-sub">connected</div>
+    </div>
+    <div class="kpi ok">
+      <div class="kpi-label">Allowed Packets</div>
+      <div class="kpi-value" id="kpi-allowed">—</div>
+      <div class="kpi-sub">forwarded</div>
+    </div>
+    <div class="kpi danger">
+      <div class="kpi-label">Blocked Packets</div>
+      <div class="kpi-value" id="kpi-blocked">—</div>
+      <div class="kpi-sub">by firewall</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Flows</div>
+      <div class="kpi-value" id="kpi-flows">—</div>
+      <div class="kpi-sub">installed</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Last Update</div>
+      <div class="kpi-value" id="kpi-time" style="font-size:15px">—</div>
+      <div class="kpi-sub">timestamp</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid-main">
+
+    <!-- Host Monitor -->
+    <div class="panel">
+      <div class="panel-head">
+        VM Host Monitor
+        <span>
+          <span class="badge">Tenant A</span>
+          <span class="badge b">Tenant B</span>
+        </span>
+      </div>
+      <div class="panel-body">
+        <div class="host-grid" id="host-grid">
+          <div class="err">Waiting for host data...<br>Make sure cloud_topology.py is running.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topology -->
+    <div class="panel">
+      <div class="panel-head">Network Topology <span>3-Tier Datacenter</span></div>
+      <div class="panel-body" style="padding:8px">
+        <svg id="topo-canvas" viewBox="0 0 500 280" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#1a3a5c"/>
+            </marker>
+          </defs>
+          <!-- Links -->
+          <g stroke="#1a3a5c" stroke-width="1.5" fill="none">
+            <!-- Core to Agg -->
+            <line x1="250" y1="40"  x2="150" y2="110"/>
+            <line x1="250" y1="40"  x2="350" y2="110"/>
+            <!-- Agg to Edge -->
+            <line x1="150" y1="110" x2="90"  y2="180"/>
+            <line x1="150" y1="110" x2="210" y2="180"/>
+            <line x1="350" y1="110" x2="290" y2="180"/>
+            <line x1="350" y1="110" x2="410" y2="180"/>
+            <!-- Edge to Hosts -->
+            <line x1="90"  y1="180" x2="60"  y2="245"/>
+            <line x1="90"  y1="180" x2="120" y2="245"/>
+            <line x1="210" y1="180" x2="180" y2="245"/>
+            <line x1="210" y1="180" x2="240" y2="245"/>
+            <line x1="290" y1="180" x2="260" y2="245"/>
+            <line x1="290" y1="180" x2="320" y2="245"/>
+            <line x1="410" y1="180" x2="380" y2="245"/>
+            <line x1="410" y1="180" x2="440" y2="245"/>
+          </g>
+          <!-- Core -->
+          <rect x="220" y="20" width="60" height="30" rx="6" fill="#0b1624" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="250" y="39" text-anchor="middle" fill="#00d4ff" font-size="11" font-family="Share Tech Mono,monospace">s1 CORE</text>
+          <!-- Agg A -->
+          <rect x="110" y="96" width="80" height="26" rx="5" fill="#0b1624" stroke="#00d4ff" stroke-width="1.2"/>
+          <text x="150" y="113" text-anchor="middle" fill="#00d4ff" font-size="10" font-family="Share Tech Mono,monospace">s2 AGG-A</text>
+          <!-- Agg B -->
+          <rect x="310" y="96" width="80" height="26" rx="5" fill="#0b1624" stroke="#b060ff" stroke-width="1.2"/>
+          <text x="350" y="113" text-anchor="middle" fill="#b060ff" font-size="10" font-family="Share Tech Mono,monospace">s3 AGG-B</text>
+          <!-- Edge switches -->
+          <rect x="62"  y="168" width="56" height="22" rx="4" fill="#0b1624" stroke="#00d4ff" stroke-width="1"/>
+          <text x="90"  y="183" text-anchor="middle" fill="#00d4ff" font-size="9" font-family="Share Tech Mono,monospace">s4 EDGE</text>
+          <rect x="182" y="168" width="56" height="22" rx="4" fill="#0b1624" stroke="#00d4ff" stroke-width="1"/>
+          <text x="210" y="183" text-anchor="middle" fill="#00d4ff" font-size="9" font-family="Share Tech Mono,monospace">s5 EDGE</text>
+          <rect x="262" y="168" width="56" height="22" rx="4" fill="#0b1624" stroke="#b060ff" stroke-width="1"/>
+          <text x="290" y="183" text-anchor="middle" fill="#b060ff" font-size="9" font-family="Share Tech Mono,monospace">s6 EDGE</text>
+          <rect x="382" y="168" width="56" height="22" rx="4" fill="#0b1624" stroke="#b060ff" stroke-width="1"/>
+          <text x="410" y="183" text-anchor="middle" fill="#b060ff" font-size="9" font-family="Share Tech Mono,monospace">s7 EDGE</text>
+          <!-- Hosts -->
+          <g id="topo-hosts">
+            <circle cx="60"  cy="248" r="10" fill="#0b1624" stroke="#00d4ff" stroke-width="1.5" class="h-dot" data-host="h1"/>
+            <circle cx="120" cy="248" r="10" fill="#0b1624" stroke="#00d4ff" stroke-width="1.5" class="h-dot" data-host="h2"/>
+            <circle cx="180" cy="248" r="10" fill="#0b1624" stroke="#00d4ff" stroke-width="1.5" class="h-dot" data-host="h3"/>
+            <circle cx="240" cy="248" r="10" fill="#0b1624" stroke="#00d4ff" stroke-width="1.5" class="h-dot" data-host="h4"/>
+            <circle cx="260" cy="248" r="10" fill="#0b1624" stroke="#b060ff" stroke-width="1.5" class="h-dot" data-host="h5"/>
+            <circle cx="320" cy="248" r="10" fill="#0b1624" stroke="#b060ff" stroke-width="1.5" class="h-dot" data-host="h6"/>
+            <circle cx="380" cy="248" r="10" fill="#0b1624" stroke="#b060ff" stroke-width="1.5" class="h-dot" data-host="h7"/>
+            <circle cx="440" cy="248" r="10" fill="#0b1624" stroke="#b060ff" stroke-width="1.5" class="h-dot" data-host="h8"/>
+            <text x="60"  y="252" text-anchor="middle" fill="#00d4ff" font-size="8" font-family="Share Tech Mono,monospace">h1</text>
+            <text x="120" y="252" text-anchor="middle" fill="#00d4ff" font-size="8" font-family="Share Tech Mono,monospace">h2</text>
+            <text x="180" y="252" text-anchor="middle" fill="#00d4ff" font-size="8" font-family="Share Tech Mono,monospace">h3</text>
+            <text x="240" y="252" text-anchor="middle" fill="#00d4ff" font-size="8" font-family="Share Tech Mono,monospace">h4</text>
+            <text x="260" y="252" text-anchor="middle" fill="#b060ff" font-size="8" font-family="Share Tech Mono,monospace">h5</text>
+            <text x="320" y="252" text-anchor="middle" fill="#b060ff" font-size="8" font-family="Share Tech Mono,monospace">h6</text>
+            <text x="380" y="252" text-anchor="middle" fill="#b060ff" font-size="8" font-family="Share Tech Mono,monospace">h7</text>
+            <text x="440" y="252" text-anchor="middle" fill="#b060ff" font-size="8" font-family="Share Tech Mono,monospace">h8</text>
+          </g>
+          <!-- Legend -->
+          <rect x="10" y="10" width="90" height="38" rx="4" fill="#0b1624" stroke="#1a3a5c"/>
+          <circle cx="22" cy="22" r="5" fill="none" stroke="#00d4ff" stroke-width="1.5"/>
+          <text x="32" y="26" fill="#00d4ff" font-size="9" font-family="Share Tech Mono,monospace">Tenant A</text>
+          <circle cx="22" cy="38" r="5" fill="none" stroke="#b060ff" stroke-width="1.5"/>
+          <text x="32" y="42" fill="#b060ff" font-size="9" font-family="Share Tech Mono,monospace">Tenant B</text>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Grid -->
+  <div class="grid-bottom">
+
+    <!-- Flow Stats -->
+    <div class="panel">
+      <div class="panel-head">Flow Table Stats <span id="flow-count-label">0 flows</span></div>
+      <div class="panel-body" style="padding:8px; overflow-x:auto; max-height:260px; overflow-y:auto">
+        <table class="flow-table" id="flow-table">
+          <thead>
+            <tr>
+              <th>Switch</th>
+              <th>Priority</th>
+              <th>Pkts</th>
+              <th>Bytes</th>
+              <th>Age(s)</th>
+            </tr>
+          </thead>
+          <tbody id="flow-tbody">
+            <tr><td colspan="5" class="err">No flow data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Port / Bandwidth Stats -->
+    <div class="panel">
+      <div class="panel-head">Port Bandwidth Stats</div>
+      <div class="panel-body" style="padding: 8px">
+        <div class="port-list" id="port-list">
+          <div class="err">No port data yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blocked Log -->
+    <div class="panel">
+      <div class="panel-head">Firewall Block Log <span id="block-count-label">0 events</span></div>
+      <div class="panel-body" style="padding:8px">
+        <div class="log-list" id="block-log">
+          <div class="err">No blocked packets yet</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080/cloud/stats';
+let lastData = null;
+
+function fmt(n) {
+  if (n === undefined || n === null) return '—';
+  if (n >= 1e9) return (n/1e9).toFixed(1)+'G';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return String(n);
+}
+
+function setLive(ok) {
+  const dot  = document.getElementById('live-dot');
+  const text = document.getElementById('live-text');
+  if (ok) {
+    dot.classList.remove('dead');
+    text.textContent = 'LIVE';
+    text.style.color = 'var(--ok)';
+  } else {
+    dot.classList.add('dead');
+    text.textContent = 'OFFLINE — start Ryu controller';
+    text.style.color = 'var(--danger)';
+  }
+}
+
+function renderHosts(hostStats) {
+  const grid = document.getElementById('host-grid');
+  const hosts = Object.keys(hostStats).filter(k => !k.startsWith('_')).sort();
+  if (!hosts.length) return;
+
+  grid.innerHTML = hosts.map(name => {
+    const h = hostStats[name];
+    const tenant = h.tenant || (name <= 'h4' ? 'A' : 'B');
+    const cpuHigh = h.cpu > 70;
+    const memHigh = h.mem > 80;
+    const rx = fmt(h.rx_bytes);
+    const tx = fmt(h.tx_bytes);
+    return `
+      <div class="host-card tenant${tenant}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="host-name">${name}</div>
+          <span class="badge ${tenant==='B'?'b':''}">${tenant}</span>
+        </div>
+        <div class="host-ip">${h.ip || '—'}</div>
+        <div class="bar-row">
+          <div class="bar-label"><span>CPU</span><span>${h.cpu}%</span></div>
+          <div class="bar-track"><div class="bar-fill ${cpuHigh?'high':''}" style="width:${Math.min(h.cpu,100)}%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label"><span>MEM</span><span>${h.mem}%</span></div>
+          <div class="bar-track"><div class="bar-fill ${memHigh?'high':''}" style="width:${Math.min(h.mem,100)}%"></div></div>
+        </div>
+        <div class="net-row">
+          <span>↓ ${rx}B</span>
+          <span>↑ ${tx}B</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Animate topology host circles based on CPU
+  document.querySelectorAll('.h-dot').forEach(el => {
+    const hn = el.dataset.host;
+    if (hostStats[hn]) {
+      const cpu = hostStats[hn].cpu;
+      const color = cpu > 70 ? '#ff3366' : cpu > 40 ? '#ff6b35' : 'none';
+      el.style.filter = cpu > 5 ? `drop-shadow(0 0 6px ${color === 'none' ? '#00d4ff' : color})` : 'none';
+    }
+  });
+}
+
+function renderFlows(flowStats) {
+  const tbody = document.getElementById('flow-tbody');
+  const rows = [];
+  let total = 0;
+  for (const [dpid, flows] of Object.entries(flowStats)) {
+    for (const f of flows) {
+      if (f.priority === 0) continue; // skip table-miss
+      rows.push(`
+        <tr>
+          <td>s${dpid}</td>
+          <td>${f.priority}</td>
+          <td>${fmt(f.packet_count)}</td>
+          <td>${fmt(f.byte_count)}</td>
+          <td>${f.duration_sec}</td>
+        </tr>`);
+      total++;
+    }
+  }
+  tbody.innerHTML = rows.length
+    ? rows.join('')
+    : '<tr><td colspan="5" style="color:var(--textdim);padding:8px">No active flows</td></tr>';
+  document.getElementById('flow-count-label').textContent = `${total} flows`;
+}
+
+function renderPorts(portStats) {
+  const list = document.getElementById('port-list');
+  const items = [];
+  for (const [dpid, ports] of Object.entries(portStats)) {
+    for (const p of ports) {
+      if (p.port_no > 100) continue; // skip internal ports
+      items.push(`
+        <div class="port-item">
+          <div class="port-header">
+            <span class="port-name">s${dpid} · port ${p.port_no}</span>
+          </div>
+          <div class="port-nums">
+            <span>↓ ${fmt(p.rx_bytes)}B</span>
+            <span>↑ ${fmt(p.tx_bytes)}B</span>
+            <span>pkts ↓${fmt(p.rx_packets)}</span>
+            <span style="color:${p.rx_errors>0?'var(--danger)':'var(--textdim)'}">
+              err ${p.rx_errors + p.tx_errors}
+            </span>
+          </div>
+        </div>`);
+    }
+  }
+  list.innerHTML = items.length
+    ? items.join('')
+    : '<div class="err">No port data — trigger some traffic first</div>';
+}
+
+function renderBlockLog(log, total) {
+  const el = document.getElementById('block-log');
+  document.getElementById('block-count-label').textContent = `${total} events`;
+  if (!log.length) {
+    el.innerHTML = '<div style="color:var(--ok);font-size:11px;padding:6px">✓ No blocked packets</div>';
+    return;
+  }
+  el.innerHTML = [...log].reverse().map(e => `
+    <div class="log-item">
+      <span class="log-time">${e.time}</span>
+      <div>
+        <div class="log-rule">⛔ ${e.rule}</div>
+        <div class="log-ips">${e.src_ip} → ${e.dst_ip} [sw${e.switch}]</div>
+      </div>
+    </div>`).join('');
+}
+
+async function refresh() {
+  try {
+    const res  = await fetch(API, { signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+    lastData   = data;
+    setLive(true);
+
+    // KPIs
+    document.getElementById('kpi-switches').textContent = Object.keys(data.switches || {}).length;
+    document.getElementById('kpi-allowed').textContent  = fmt(data.allowed_pkts);
+    document.getElementById('kpi-blocked').textContent  = fmt(data.blocked_pkts);
+    const totalFlows = Object.values(data.flow_stats || {})
+      .reduce((s, arr) => s + arr.length, 0);
+    document.getElementById('kpi-flows').textContent = totalFlows;
+    document.getElementById('kpi-time').textContent  =
+      data.last_updated ? new Date(data.last_updated*1000).toLocaleTimeString() : '—';
+
+    // Sections
+    if (data.host_stats && Object.keys(data.host_stats).length > 1)
+      renderHosts(data.host_stats);
+    if (data.flow_stats) renderFlows(data.flow_stats);
+    if (data.port_stats) renderPorts(data.port_stats);
+    renderBlockLog(data.blocked_log || [], data.blocked_pkts || 0);
+
+  } catch (e) {
+    setLive(false);
+  }
+}
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>
