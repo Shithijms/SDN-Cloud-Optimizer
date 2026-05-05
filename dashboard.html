@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Cloud SDN Monitor | Pro Edition</title>
+  <!-- Fonts & Charts -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #050a12;
+      --panel: #0b1624;
+      --border: #1a3a5c;
+      --accent: #00d4ff;
+      --accent2: #00ff9d;
+      --warn: #ff6b35;
+      --dim: #3a5a7a;
+      --text: #c8e0f0;
+      --textdim: #5a8aaa;
+      --tenantA: #00d4ff;
+      --tenantB: #b060ff;
+      --ok: #00ff9d;
+      --danger: #ff3366;
+      --shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+
+    body.light {
+      --bg: #eef2f5;
+      --panel: #ffffff;
+      --border: #cbd5e1;
+      --text: #1e293b;
+      --textdim: #475569;
+      --shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 13px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* Grid background (only dark) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body.light::before { display: none; }
+
+    .wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Header & live badge */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+    .subtitle {
+      font-size: 11px;
+      color: var(--textdim);
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel);
+      padding: 5px 12px;
+      border-radius: 40px;
+      border: 1px solid var(--border);
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--ok);
+      animation: blink 1.2s infinite;
+    }
+    .dot.dead {
+      background: var(--danger);
+      animation: none;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    button, .theme-toggle, .export-btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* KPI bar */
+    .kpi-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      position: relative;
+      box-shadow: var(--shadow);
+    }
+    .kpi::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      border-radius: 14px 14px 0 0;
+    }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--textdim); }
+    .kpi-value { font-size: 28px; font-weight: 800; font-family: 'Share Tech Mono', monospace; color: var(--accent); }
+    .danger .kpi-value { color: var(--danger); }
+    .ok .kpi-value { color: var(--ok); }
+
+    /* Layout grids */
+    .grid-main, .grid-bottom {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .grid-main {
+      grid-template-columns: 1fr 1.2fr;
+    }
+    .grid-bottom {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .panel-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      background: rgba(0,212,255,0.02);
+    }
+    .panel-body {
+      padding: 14px;
+    }
+    .search-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .search-filter input, .search-filter select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 20px;
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      font-size: 12px;
+    }
+
+    /* Host cards */
+    .host-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .host-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .host-card.tenantA { border-left: 4px solid var(--tenantA); }
+    .host-card.tenantB { border-left: 4px solid var(--tenantB); }
+    .bar-track {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 6px 0;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+    }
+    .bar-fill.high { background: linear-gradient(90deg, var(--warn), var(--danger)); }
+    .net-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    /* SVG topology clickable */
+    .topo-svg {
+      width: 100%;
+      height: auto;
+      cursor: pointer;
+    }
+    .topo-svg circle, .topo-svg rect {
+      transition: filter 0.2s, stroke-width 0.1s;
+    }
+    .topo-svg circle:hover, .topo-svg rect:hover {
+      filter: drop-shadow(0 0 6px var(--accent));
+      stroke-width: 2;
+    }
+
+    /* Tables & logs */
+    .flow-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .flow-table th, .flow-table td {
+      padding: 8px 6px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .log-list, .port-list {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .log-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--border) 25%, var(--dim) 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px;
+      height: 60px;
+      margin: 8px 0;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    @media (max-width: 900px) {
+      .grid-main, .grid-bottom { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">☁️</div>
+      <div><h1>CLOUD SDN MONITOR</h1><div class="subtitle">Ryu · OpenFlow 1.3 · Multi‑Tenant</div></div>
+    </div>
+    <div class="controls">
+      <button id="themeToggle" class="theme-toggle">🌙 Dark</button>
+      <button id="exportCsvBtn" class="export-btn">📎 Export CSV</button>
+      <div class="live-badge"><div class="dot" id="liveDot"></div><span id="liveText">LIVE</span></div>
+    </div>
+  </header>
+
+  <!-- KPI Bar -->
+  <div class="kpi-bar">
+    <div class="kpi"><div class="kpi-label">Switches</div><div class="kpi-value" id="kpiSwitches">—</div></div>
+    <div class="kpi ok"><div class="kpi-label">Allowed Pkts</div><div class="kpi-value" id="kpiAllowed">—</div></div>
+    <div class="kpi danger"><div class="kpi-label">Blocked Pkts</div><div class="kpi-value" id="kpiBlocked">—</div></div>
+    <div class="kpi"><div class="kpi-label">Total Flows</div><div class="kpi-value" id="kpiFlows">—</div></div>
+    <div class="kpi"><div class="kpi-label">Last Update</div><div class="kpi-value" id="kpiTime" style="font-size:16px">—</div></div>
+  </div>
+
+  <!-- Charts Row (Historical) -->
+  <div class="panel" style="margin-bottom:18px">
+    <div class="panel-head">📈 Bandwidth & Block Trend (last 20 samples)</div>
+    <div class="panel-body" style="padding:10px">
+      <canvas id="trendChart" width="400" height="150" style="max-height:180px; width:100%"></canvas>
+    </div>
+  </div>
+
+  <div class="grid-main">
+    <!-- Host Monitor with tenant filter -->
+    <div class="panel">
+      <div class="panel-head">
+        🖥️ VM Hosts
+        <select id="tenantFilter">
+          <option value="all">All Tenants</option><option value="A">Tenant A</option><option value="B">Tenant B</option>
+        </select>
+      </div>
+      <div class="panel-body" id="hostContainer"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>
+    <!-- Interactive Topology -->
+    <div class="panel">
+      <div class="panel-head">🌐 Network Topology <span>click switch/host → filter flows</span></div>
+      <div class="panel-body" style="padding:6px">
+        <svg id="topoSvg" class="topo-svg" viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg">
+          <!-- pre‑drawn elements will be populated later, but static background -->
+          <g id="topoElements"></g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-bottom">
+    <!-- Flow Table with search -->
+    <div class="panel">
+      <div class="panel-head">📋 Flow Stats <span id="flowCountLabel">0 flows</span></div>
+      <div class="panel-body">
+        <div class="search-filter"><input type="text" id="flowSearch" placeholder="Filter flows (switch, priority...)"></div>
+        <div style="max-height:260px; overflow:auto"><table class="flow-table"><thead><tr><th>Switch</th><th>Pri</th><th>Pkts</th><th>Bytes</th><th>Age(s)</th></tr></thead><tbody id="flowTbody"><tr><td colspan="5">Loading..</td></tr></tbody></table></div>
+      </div>
+    </div>
+    <!-- Port stats -->
+    <div class="panel">
+      <div class="panel-head">🔌 Port Bandwidth</div>
+      <div class="panel-body"><div id="portList" class="port-list"><div class="skeleton"></div></div></div>
+    </div>
+    <!-- Block Log with filter -->
+    <div class="panel">
+      <div class="panel-head">🚫 Firewall Blocks <span id="blockCountLabel">0</span></div>
+      <div class="panel-body">
+        <div class="search-filter"><input type="text" id="blockSearch" placeholder="Filter src/dst IP"></div>
+        <div id="blockLogList" class="log-list"><div class="skeleton"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ------------------------------ CONFIG ------------------------------
+  const CONFIG = {
+    apiUrl: 'http://localhost:8080/cloud/stats',
+    wsUrl: 'ws://localhost:8080/cloud/ws',
+    useWebSocket: true,
+    pollingIntervalMs: 4000,
+    maxHistoryPoints: 20
+  };
+
+  // ------------------------------ GLOBAL STATE ------------------------------
+  let state = {
+    lastData: null,
+    history: { timestamps: [], allowed: [], blocked: [] },
+    chart: null,
+    ws: null,
+    pollingTimer: null,
+    selectedTenant: 'all',
+    flowSearchTerm: '',
+    blockSearchTerm: '',
+    selectedTopoId: null    // switch or host id for filtering flows
+  };
+
+  // ------------------------------ DOM Elements ------------------------------
+  const els = {
+    kpiSwitches: document.getElementById('kpiSwitches'),
+    kpiAllowed: document.getElementById('kpiAllowed'),
+    kpiBlocked: document.getElementById('kpiBlocked'),
+    kpiFlows: document.getElementById('kpiFlows'),
+    kpiTime: document.getElementById('kpiTime'),
+    liveDot: document.getElementById('liveDot'),
+    liveText: document.getElementById('liveText'),
+    tenantFilter: document.getElementById('tenantFilter'),
+    flowSearch: document.getElementById('flowSearch'),
+    blockSearch: document.getElementById('blockSearch'),
+    flowTbody: document.getElementById('flowTbody'),
+    flowCountLabel: document.getElementById('flowCountLabel'),
+    blockLogList: document.getElementById('blockLogList'),
+    blockCountLabel: document.getElementById('blockCountLabel'),
+    portList: document.getElementById('portList'),
+    hostContainer: document.getElementById('hostContainer'),
+    topoSvg: document.getElementById('topoSvg'),
+    themeToggle: document.getElementById('themeToggle'),
+    exportBtn: document.getElementById('exportCsvBtn')
+  };
+
+  // ------------------------------ Helper Functions ------------------------------
+  function fmt(n) {
+    if (n === undefined || n === null) return '0';
+    if (n >= 1e9) return (n/1e9).toFixed(1)+'G';
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+    return String(n);
+  }
+
+  function setLive(ok) {
+    if (ok) {
+      els.liveDot.classList.remove('dead');
+      els.liveText.textContent = 'LIVE · WS';
+      els.liveText.style.color = 'var(--ok)';
+    } else {
+      els.liveDot.classList.add('dead');
+      els.liveText.textContent = 'POLLING';
+      els.liveText.style.color = 'var(--danger)';
+    }
+  }
+
+  function updateHistory(data) {
+    const now = Date.now();
+    state.history.timestamps.push(now);
+    state.history.allowed.push(data.allowed_pkts || 0);
+    state.history.blocked.push(data.blocked_pkts || 0);
+    if (state.history.timestamps.length > CONFIG.maxHistoryPoints) {
+      state.history.timestamps.shift();
+      state.history.allowed.shift();
+      state.history.blocked.shift();
+    }
+    if (state.chart) {
+      state.chart.data.datasets[0].data = [...state.history.allowed];
+      state.chart.data.datasets[1].data = [...state.history.blocked];
+      state.chart.update();
+    }
+  }
+
+  function initChart() {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    state.chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: state.history.timestamps.map(()=>''), datasets: [
+        { label: 'Allowed Packets', borderColor: '#00ff9d', backgroundColor: 'transparent', tension: 0.2, fill: false, data: [] },
+        { label: 'Blocked Packets', borderColor: '#ff3366', backgroundColor: 'transparent', tension: 0.2, fill: false, data: [] }
+      ]},
+      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: 'var(--text)' } } } }
+    });
+  }
+
+  // ------------------------------ RENDER FUNCTIONS ------------------------------
+  function renderHosts() {
+    if (!state.lastData || !state.lastData.host_stats) { els.hostContainer.innerHTML = '<div class="skeleton"></div>'; return; }
+    const hosts = state.lastData.host_stats;
+    let filtered = Object.keys(hosts).filter(k => !k.startsWith('_'));
+    if (state.selectedTenant !== 'all') {
+      filtered = filtered.filter(h => (hosts[h].tenant || (h <= 'h4' ? 'A' : 'B')) === state.selectedTenant);
+    }
+    els.hostContainer.innerHTML = filtered.map(name => {
+      const h = hosts[name];
+      const tenant = h.tenant || (name <= 'h4' ? 'A' : 'B');
+      const cpuHigh = h.cpu > 70;
+      const memHigh = h.mem > 80;
+      return `<div class="host-card tenant${tenant}">
+        <div><strong>${name}</strong> <span class="badge">${tenant}</span></div>
+        <div class="host-ip">${h.ip || '—'}</div>
+        <div class="bar-row"><div class="bar-label"><span>CPU ${h.cpu}%</span></div><div class="bar-track"><div class="bar-fill ${cpuHigh?'high':''}" style="width:${Math.min(h.cpu,100)}%"></div></div></div>
+        <div class="bar-row"><div class="bar-label"><span>MEM ${h.mem}%</span></div><div class="bar-track"><div class="bar-fill ${memHigh?'high':''}" style="width:${Math.min(h.mem,100)}%"></div></div></div>
+        <div class="net-row"><span>↓ ${fmt(h.rx_bytes)}B</span><span>↑ ${fmt(h.tx_bytes)}B</span></div>
+      </div>`;
+    }).join('');
+    updateTopologyColors(hosts);
+  }
+
+  function updateTopologyColors(hosts) {
+    // update existing host circles inside the svg (dynamically drawn topology)
+    drawTopology(hosts);
+  }
+
+  function drawTopology(hosts) {
+    const svg = els.topoSvg;
+    const defs = `<defs><marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#1a3a5c"/></marker></defs>`;
+    let links = `<g stroke="var(--border)" stroke-width="1.5" fill="none">
+      <line x1="280" y1="40"  x2="180" y2="110"/><line x1="280" y1="40" x2="380" y2="110"/>
+      <line x1="180" y1="110" x2="110" y2="180"/><line x1="180" y1="110" x2="250" y2="180"/>
+      <line x1="380" y1="110" x2="310" y2="180"/><line x1="380" y1="110" x2="450" y2="180"/>
+      <line x1="110" y1="180" x2="70" y2="250"/><line x1="110" y1="180" x2="150" y2="250"/>
+      <line x1="250" y1="180" x2="200" y2="250"/><line x1="250" y1="180" x2="280" y2="250"/>
+      <line x1="310" y1="180" x2="300" y2="250"/><line x1="310" y1="180" x2="350" y2="250"/>
+      <line x1="450" y1="180" x2="410" y2="250"/><line x1="450" y1="180" x2="490" y2="250"/>
+    </g>`;
+    let switches = `<g>
+      <rect x="250" y="20" width="60" height="30" rx="6" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5" data-id="s1"/><text x="280" y="40" text-anchor="middle" fill="var(--accent)" font-size="10">s1 CORE</text>
+      <rect x="140" y="96" width="80" height="26" rx="5" fill="var(--panel)" stroke="var(--accent)" data-id="s2"/><text x="180" y="113" text-anchor="middle" fill="var(--accent)" font-size="9">s2 AGG-A</text>
+      <rect x="340" y="96" width="80" height="26" rx="5" fill="var(--panel)" stroke="var(--tenantB)" data-id="s3"/><text x="380" y="113" text-anchor="middle" fill="var(--tenantB)" font-size="9">s3 AGG-B</text>
+      <rect x="80" y="168" width="60" height="22" rx="4" fill="var(--panel)" stroke="var(--accent)" data-id="s4"/><text x="110" y="183" fill="var(--accent)" font-size="8">s4</text>
+      <rect x="220" y="168" width="60" height="22" rx="4" fill="var(--panel)" stroke="var(--accent)" data-id="s5"/><text x="250" y="183" fill="var(--accent)" font-size="8">s5</text>
+      <rect x="280" y="168" width="60" height="22" rx="4" fill="var(--panel)" stroke="var(--tenantB)" data-id="s6"/><text x="310" y="183" fill="var(--tenantB)" font-size="8">s6</text>
+      <rect x="420" y="168" width="60" height="22" rx="4" fill="var(--panel)" stroke="var(--tenantB)" data-id="s7"/><text x="450" y="183" fill="var(--tenantB)" font-size="8">s7</text>
+    </g>`;
+    let hostCircles = `<g id="topoHosts">`;
+    const hostPositions = { h1:[70,250], h2:[150,250], h3:[200,250], h4:[280,250], h5:[300,250], h6:[350,250], h7:[410,250], h8:[490,250] };
+    for (let i=1;i<=8;i++) {
+      let hn = `h${i}`;
+      let tenant = hosts[hn]?.tenant || (hn <= 'h4' ? 'A' : 'B');
+      let color = tenant === 'A' ? 'var(--tenantA)' : 'var(--tenantB)';
+      let [cx,cy] = hostPositions[hn];
+      hostCircles += `<circle cx="${cx}" cy="${cy}" r="9" fill="var(--panel)" stroke="${color}" stroke-width="1.5" data-id="${hn}" class="topo-host"/><text x="${cx}" y="${cy+3}" text-anchor="middle" fill="${color}" font-size="7">${hn}</text>`;
+    }
+    hostCircles += `</g>`;
+    svg.innerHTML = defs + links + switches + hostCircles;
+    // Attach click events for topology filtering
+    document.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = el.getAttribute('data-id');
+        state.selectedTopoId = id;
+        renderFlows();
+      });
+    });
+  }
+
+  function renderFlows() {
+    if (!state.lastData?.flow_stats) { els.flowTbody.innerHTML = '<tr><td colspan="5">No flow data</td></tr>'; return; }
+    let flows = [];
+    for (const [dpid, arr] of Object.entries(state.lastData.flow_stats)) {
+      for (const f of arr) {
+        if (f.priority === 0) continue;
+        flows.push({ switch: `s${dpid}`, priority: f.priority, packets: f.packet_count, bytes: f.byte_count, age: f.duration_sec });
+      }
+    }
+    if (state.selectedTopoId) {
+      flows = flows.filter(f => f.switch === state.selectedTopoId || state.selectedTopoId.startsWith('h')? false : f.switch === state.selectedTopoId);
+    }
+    if (state.flowSearchTerm) {
+      const term = state.flowSearchTerm.toLowerCase();
+      flows = flows.filter(f => f.switch.toLowerCase().includes(term) || f.priority.toString().includes(term));
+    }
+    els.flowCountLabel.textContent = `${flows.length} flows`;
+    if (!flows.length) { els.flowTbody.innerHTML = '<tr><td colspan="5">No matching flows</td></tr>'; return; }
+    els.flowTbody.innerHTML = flows.map(f => `<tr><td>${f.switch}</td><td>${f.priority}</td><td>${fmt(f.packets)}</td><td>${fmt(f.bytes)}</td><td>${f.age}</td></tr>`).join('');
+  }
+
+  function renderPorts() {
+    if (!state.lastData?.port_stats) { els.portList.innerHTML = '<div class="err">No port data</div>'; return; }
+    let items = [];
+    for (const [dpid, ports] of Object.entries(state.lastData.port_stats)) {
+      for (const p of ports) {
+        if (p.port_no > 100) continue;
+        items.push(`<div class="port-item"><div><strong>s${dpid} · port ${p.port_no}</strong></div><div>↓ ${fmt(p.rx_bytes)}B ↑ ${fmt(p.tx_bytes)}B | err ${p.rx_errors+p.tx_errors}</div></div>`);
+      }
+    }
+    els.portList.innerHTML = items.length ? items.join('') : '<div>No active ports</div>';
+  }
+
+  function renderBlockLog() {
+    let logs = state.lastData?.blocked_log || [];
+    if (state.blockSearchTerm) {
+      const term = state.blockSearchTerm.toLowerCase();
+      logs = logs.filter(l => l.src_ip.includes(term) || l.dst_ip.includes(term));
+    }
+    els.blockCountLabel.textContent = `${logs.length}`;
+    if (!logs.length) { els.blockLogList.innerHTML = '<div>✅ No blocked packets</div>'; return; }
+    els.blockLogList.innerHTML = logs.slice().reverse().map(l => `<div class="log-item"><span style="color:var(--warn)">⛔ ${l.rule}</span><br><span class="log-ips">${l.src_ip} → ${l.dst_ip} [sw${l.switch}] at ${l.time}</span></div>`).join('');
+  }
+
+  function fullRender() {
+    if (!state.lastData) return;
+    renderHosts();
+    renderFlows();
+    renderPorts();
+    renderBlockLog();
+    // update KPIs
+    els.kpiSwitches.textContent = Object.keys(state.lastData.switches || {}).length;
+    els.kpiAllowed.textContent = fmt(state.lastData.allowed_pkts);
+    els.kpiBlocked.textContent = fmt(state.lastData.blocked_pkts);
+    let totalFlows = Object.values(state.lastData.flow_stats || {}).reduce((s,arr)=> s+arr.length,0);
+    els.kpiFlows.textContent = totalFlows;
+    els.kpiTime.textContent = state.lastData.last_updated ? new Date(state.lastData.last_updated*1000).toLocaleTimeString() : '—';
+  }
+
+  // ------------------------------ DATA FETCH & WEBSOCKET ------------------------------
+  async function fetchRest() {
+    try {
+      const res = await fetch(CONFIG.apiUrl, { signal: AbortSignal.timeout(3000) });
+      const data = await res.json();
+      state.lastData = data;
+      updateHistory(data);
+      fullRender();
+      setLive(false); // polling mode
+    } catch(e) { setLive(false); }
+  }
+
+  function initWebSocket() {
+    if (!CONFIG.useWebSocket) return;
+    try {
+      state.ws = new WebSocket(CONFIG.wsUrl);
+      state.ws.onopen = () => { if (state.pollingTimer) clearInterval(state.pollingTimer); setLive(true); };
+      state.ws.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data);
+          state.lastData = data;
+          updateHistory(data);
+          fullRender();
+        } catch(e) {}
+      };
+      state.ws.onerror = () => { fallbackToPolling(); };
+      state.ws.onclose = () => { fallbackToPolling(); };
+    } catch(e) { fallbackToPolling(); }
+  }
+
+  function fallbackToPolling() {
+    if (state.ws) state.ws.close();
+    if (state.pollingTimer) clearInterval(state.pollingTimer);
+    state.pollingTimer = setInterval(fetchRest, CONFIG.pollingIntervalMs);
+    fetchRest();
+    setLive(false);
+  }
+
+  // ------------------------------ THEME, EXPORT, FILTERS ------------------------------
+  function initTheme() { 
+    const isLight = localStorage.getItem('sdnTheme') === 'light';
+    if (isLight) document.body.classList.add('light');
+    els.themeToggle.onclick = () => {
+      document.body.classList.toggle('light');
+      localStorage.setItem('sdnTheme', document.body.classList.contains('light') ? 'light' : 'dark');
+    };
+  }
+
+  function exportCsv() {
+    if (!state.lastData?.flow_stats) return;
+    let rows = [['Switch','Priority','Packets','Bytes','Age']];
+    for (const [dpid, arr] of Object.entries(state.lastData.flow_stats)) {
+      for (const f of arr) rows.push([`s${dpid}`, f.priority, f.packet_count, f.byte_count, f.duration_sec]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `sdn_flows_${Date.now()}.csv`;
+    a.click();
+  }
+
+  // register event listeners
+  els.tenantFilter.addEventListener('change', (e) => { state.selectedTenant = e.target.value; renderHosts(); });
+  els.flowSearch.addEventListener('input', (e) => { state.flowSearchTerm = e.target.value; renderFlows(); });
+  els.blockSearch.addEventListener('input', (e) => { state.blockSearchTerm = e.target.value; renderBlockLog(); });
+  els.exportBtn.addEventListener('click', exportCsv);
+
+  // ------------------------------ BOOTSTRAP ------------------------------
+  function start() {
+    initChart();
+    initTheme();
+    initWebSocket();
+    // draw initial topology
+    drawTopology({});
+    setLive(false);
+  }
+  start();
+</script>
+</body>
+</html>
