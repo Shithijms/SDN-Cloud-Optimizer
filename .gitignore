@@ -1,0 +1,7 @@
+.venv
+src/scheduler/__pycache__/*
+project_dump.txt
+src\monitor\__pycache__/*
+src\__pycache__/*__pycache__/
+*.pyc
+*.py~
