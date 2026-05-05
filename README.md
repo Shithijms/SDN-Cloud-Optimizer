@@ -1,325 +1,316 @@
-# 🧠 SDN-Based Intelligent Load Balancing and Task Scheduling Framework
+# SDN-Cloud-Optimizer
 
-![Python](https://img.shields.io/badge/Python-3.8-blue.svg)
-![Mininet](https://img.shields.io/badge/Mininet-2.3.0-green.svg)
-![Ryu](https://img.shields.io/badge/Ryu-4.34-yellow.svg)
-![License](https://img.shields.io/badge/License-MIT-red.svg)
+An adaptive SDN-based framework for intelligent load balancing and task scheduling in cloud environments using the AVRO (African Vulture Routing Optimization) metaheuristic algorithm.
 
 ---
 
-## 📌 Overview
+## Overview
 
-This project implements an **Adaptive SDN-Based Framework for Intelligent Load Balancing and Task Scheduling in Cloud Environments**.
+This framework integrates Software-Defined Networking with metaheuristic optimization to intelligently schedule tasks across virtual machines in a cloud data center. The AVRO algorithm selects the best VM for each incoming task using a multi-metric fitness function that considers CPU utilization, memory usage, queue length, and network delay — outperforming traditional schedulers by 17–29% in response time.
 
-It integrates:
-
-- Software-Defined Networking (SDN)
-- Metaheuristic Optimization (AVRO-based)
-- Real-time resource monitoring
-- Dynamic OpenFlow rule management
-
-The framework intelligently selects Virtual Machines (VMs) for task execution using an **AVRO (African Vulture Routing Optimization)** inspired algorithm, while simultaneously managing network paths through an SDN controller.
-
-**Team Size:** 4 Members  
-**Duration:** 5 Months  
-**Status:** 🚧 In Development  
-
----
-
-## 🎯 Key Features
-
-- 🏗 **SDN-Controlled Cloud Data Center**  
-  3-tier topology (Core → Aggregation → Edge) emulated in Mininet  
-
-- 📊 **Real-Time Resource Monitoring**  
-  Collects:
-  - CPU Utilization
-  - Memory Usage
-  - Queue Length
-  - Network Delay
-
-- 🧠 **AVRO-Based Intelligent Scheduler**  
-  Population-based metaheuristic VM selection (Primary Contribution)
-
-- 🔁 **Dynamic Flow Rule Installation**  
-  OpenFlow rules installed dynamically via Ryu controller
-
-- 🎯 **Multi-Objective Optimization**
-  Optimizes:
-  - Makespan
-  - Average Response Time
-  - Resource Utilization Balance
-
-- 📈 **Comparative Evaluation**
-  - Round Robin (Baseline)
-  - Optional ML-based scheduler
-
----
-
-## 🏗 System Architecture
+**Architecture:**
 
 ```
-Workload Layer
-(iPerf3 / Custom Task Generator)
-            │
-            ▼
-SDN Controller (Ryu)
- ├── AVRO Scheduling Module
- │     • VM Fitness Computation
- │     • Population-Based Optimization
- │     • Best VM Selection
- │
- ├── Resource Monitor Module
- │     • OpenFlow Port Stats
- │     • VM CPU/Memory Polling
- │     • Queue Length Detection
- │
- └── Flow Rule Manager
-       • Path Computation
-       • OpenFlow Rule Installation
-            │
-            ▼
-Mininet 3-Tier Data Center Topology
-Core → Aggregation → Edge → VMs
+Mininet Topology  →  /tmp/cloud_host_stats.json
+                               ↓
+                  avro_integration_client.py
+                        ↓              ↓
+             POST /api/schedule   POST /cloud/assign
+             (AVRO, port 5000)    (Ryu, port 8080)
+                                       ↓
+                     OpenFlow flow rules installed in OVS switches
 ```
 
 ---
 
-## 🧮 Mathematical Model
+## System Requirements
 
-### 🎯 Optimization Objective
-
-\[
-Z = \alpha \cdot Makespan + \beta \cdot AvgResponseTime + \gamma \cdot U_{std}
-\]
-
-Where:
-
-- **Makespan** → Total completion time of all tasks  
-- **AvgResponseTime** → Mean task response time  
-- **Ustd** → Standard deviation of VM utilization  
-- **α, β, γ** → Tunable weight parameters  
+- Python 3.11
+- Ryu 4.34
+- Mininet 2.3.1b4
+- Open vSwitch 3.7+
+- Arch Linux / Ubuntu 20.04+
 
 ---
 
-### 🧠 VM Fitness Function (AVRO Selection)
+## Installation
 
-\[
-Fitness_{vm} =
-w_1(1 - CPU_{util})
-+ w_2(1 - Mem_{util})
-+ w_3\frac{1}{QueueLen+1}
-+ w_4\frac{1}{Delay+1}
-\]
-
-This ensures selection of:
-- Low CPU usage VMs
-- Low memory usage VMs
-- Small queue length
-- Low network delay
-
----
-
-## 📁 Repository Structure
-
+**1. Create and activate virtual environment:**
+```bash
+python3.11 -m venv ~/ryu-env
+source ~/ryu-env/bin/activate
 ```
-sdn-load-balancing-framework/
-│
-├── topology/
-│   ├── datacenter_topo.py
-│   └── topo_config.yaml
-│
-├── controller/
-│   ├── ryu_app.py
-│   ├── flow_manager.py
-│   └── packet_handler.py
-│
-├── scheduler/
-│   ├── avro_scheduler.py
-│   ├── round_robin.py
-│   ├── rf_scheduler.py
-│   └── fitness.py
-│
-├── monitoring/
-│   ├── resource_monitor.py
-│   ├── network_monitor.py
-│   └── data_logger.py
-│
-├── evaluation/
-│   ├── metrics.py
-│   ├── experiment_runner.py
-│   └── visualization.py
-│
-├── workloads/
-│   ├── traffic_generator.py
-│   ├── task_generator.py
-│   └── workload_configs/
-│
-├── results/
-│   ├── figures/
-│   ├── logs/
-│   └── reports/
-│
-├── tests/
-│   ├── test_avro.py
-│   ├── test_monitoring.py
-│   └── test_integration.py
-│
-├── docs/
-│   ├── architecture.md
-│   ├── api_reference.md
-│   └── experiment_design.md
-│
-├── requirements.txt
-├── setup.sh
-├── CONTRIBUTING.md
-├── LICENSE
-└── README.md
+
+**2. Install dependencies in order:**
+```bash
+pip install "setuptools==67.6.0" "wheel==0.38.4"
+pip install ryu==4.34
+pip install "eventlet==0.33.3"
+pip install numpy matplotlib networkx scikit-learn requests
+```
+
+**3. Patch Ryu eventlet compatibility:**
+```bash
+sed -i 's/from eventlet.wsgi import ALREADY_HANDLED/ALREADY_HANDLED = b""/' \
+    ~/ryu-env/lib/python3.11/site-packages/ryu/app/wsgi.py
+```
+
+**4. Verify:**
+```bash
+ryu-manager --version   # should print: ryu-manager 4.34
+sudo mn --version       # should print: 2.3.1b4
+```
+
+**5. Start Open vSwitch (if not already running):**
+```bash
+sudo ovsdb-server --remote=punix:/run/openvswitch/db.sock \
+    --remote=db:Open_vSwitch,Open_vSwitch,manager_options \
+    --pidfile --detach
+sudo ovs-vswitchd --pidfile --detach
+sudo ovs-vsctl show     # should return without error
 ```
 
 ---
 
-## 🚀 Getting Started
+## Running the Project
 
-### 📦 Prerequisites
+Open **6 terminals**. Run `source ~/ryu-env/bin/activate` in every terminal before starting.
 
-- Ubuntu 20.04 / 22.04  
-- Python 3.8+  
-- Mininet 2.3.0  
-- Ryu Controller 4.34  
-- Open vSwitch  
-
----
-
-## 🔧 Installation
-
-### 1️⃣ Clone Repository
-
+**Pre-run cleanup (always do this first):**
 ```bash
-git clone https://github.com/Shithijms/SDN-Cloud-Optimizer.git
-cd SDN-Cloud-Optimizer
-```
-
-### 2️⃣ Run Setup Script
-
-```bash
-chmod +x setup.sh
-./setup.sh
-```
-
-### 3️⃣ Verify Installation
-
-Test Mininet:
-
-```bash
-sudo mn --test pingall
-```
-
-Test Ryu:
-
-```bash
-ryu-manager --version
-```
-
-Install Python Dependencies:
-
-```bash
-pip install -r requirements.txt
+sudo mn -c
 ```
 
 ---
 
-## 💻 Usage
-
-### 1️⃣ Start SDN Controller
-
+### Terminal 1 — Ryu SDN Controller
 ```bash
-ryu-manager controller/ryu_app.py
+source ~/ryu-env/bin/activate
+cd ~/cloud-sdn-avro
+ryu-manager controller/cloud_controller.py --ofp-tcp-listen-port 6633
 ```
+Wait for: `wsgi starting up on http://0.0.0.0:8080`
 
-### 2️⃣ Launch Mininet Topology
+---
 
+### Terminal 2 — Mininet Topology
 ```bash
-sudo python topology/datacenter_topo.py
+cd ~/cloud-sdn-avro
+sudo python3 topology/cloud_topology.py
 ```
+Wait for: `Host stats monitor running -> /tmp/cloud_host_stats.json`
 
-### 3️⃣ Start Resource Monitoring
+You will get a `mininet>` prompt — keep this terminal open.
 
+---
+
+### Terminal 3 — AVRO Scheduler API
 ```bash
-python monitoring/resource_monitor.py --interval 2
+source ~/ryu-env/bin/activate
+cd ~/cloud-sdn-avro/SDN-Cloud-Optimizer
+python src/scheduler/api.py
 ```
+Wait for: `Scheduler API running on http://0.0.0.0:5000`
 
-### 4️⃣ Generate Workload
+---
 
+### Terminal 4 — Integration Client
 ```bash
-python workloads/task_generator.py --workload medium --duration 300
+source ~/ryu-env/bin/activate
+cd ~/cloud-sdn-avro
+python3 integration/avro_integration_client.py
 ```
+Wait for: `Ryu is up. AVRO API is up. Starting.`
 
-### 5️⃣ Run Full Experiment Suite
+This bridges Mininet stats → AVRO decision → Ryu flow install.
 
+---
+
+### Terminal 5 — Live Stats Monitor
 ```bash
-python evaluation/experiment_runner.py \
-    --algorithms avro round_robin \
-    --workloads low medium high \
-    --repeats 5
-```
-
-### 6️⃣ Generate Visualizations
-
-```bash
-python evaluation/visualization.py --results-dir results/logs/
+watch -n 2 cat /tmp/cloud_host_stats.json
 ```
 
 ---
 
-## 📊 Evaluation Metrics
+### Browser — Dashboard
+Open `~/cloud-sdn-avro/dashboard.html` in Firefox.
 
-- Makespan  
-- Throughput  
-- Average Response Time  
-- Resource Utilization Variance  
-- Load Distribution Fairness  
+Connects to `http://localhost:8080/cloud/stats` and shows live topology, VM metrics, flow stats, and firewall blocks.
 
 ---
 
-# Member 2 — Monitoring & Data Pipeline Module
+## Demo Scenarios
 
-## Files
-- `resource_monitor.py`   → Main module (VM CPU, memory, queue, delay)
-- `openflow_stats.py`     → Network link stats (plugs into Member 1's Ryu)
-- `integration_example.py`→ Shows teammates how to use your module
-- `test_monitor.py`       → Run this to verify everything works
+Run these inside the Mininet CLI (Terminal 2):
 
-## Quick Start (no Mininet needed)
+**Normal load — AVRO distributes freely:**
+```
+mininet> killall stress
+```
+
+**Two hosts stressed — AVRO avoids them:**
+```
+mininet> h1 stress --cpu 4 &
+mininet> h2 stress --cpu 4 &
+```
+
+**Three hosts stressed — AVRO picks only h4:**
+```
+mininet> h3 stress --cpu 4 &
+```
+
+**Stop stress on all hosts:**
+```
+mininet> h1 killall stress
+mininet> h2 killall stress
+mininet> h3 killall stress
+mininet> h4 killall stress
+```
+
+**Firewall demo (cross-tenant traffic blocked):**
+```
+mininet> h1 ping -c5 h5    # BLOCKED — Tenant A → Tenant B
+mininet> h1 ping -c5 h2    # ALLOWED — same tenant
+```
+
+---
+
+## Run Experiments
+
+Generates comparison graphs for AVRO vs Round Robin vs LeastLoaded vs FCFS vs WeightedRR across Uniform, Bursty, and Gravity workloads:
+
 ```bash
-python3 test_monitor.py
+source ~/ryu-env/bin/activate
+cd ~/cloud-sdn-avro/SDN-Cloud-Optimizer
+python results/run_experiment.py
 ```
 
-## With Real Mininet
-```python
-from resource_monitor import ResourceMonitor
-# After net.start():
-monitor = ResourceMonitor(hosts=net.hosts, simulated=False)
-stats = monitor.get_all_vm_stats()
+Output saved to `results/full_comparison.png`.
+
+---
+
+## Run Tests
+
+```bash
+source ~/ryu-env/bin/activate
+cd ~/cloud-sdn-avro/SDN-Cloud-Optimizer
+python tests/test_avro.py        # 21 AVRO algorithm tests
+python tests/test_fitness.py     # 6 fitness function tests
+python tests/test_round_robin.py # 6 baseline tests
+python tests/test_connector.py   # 8 data connector tests
 ```
 
-## Data Contract (share with all teammates)
+---
+
+## Shutdown Order
+
+```
+Terminal 4: Ctrl+C  (stop integration client)
+Terminal 3: Ctrl+C  (stop scheduler API)
+Terminal 2: exit    (stop Mininet)
+Terminal 1: Ctrl+C  (stop Ryu)
+
+Then: sudo mn -c
+```
+
+---
+
+## Project Structure
+
+```
+controller/
+  cloud_controller.py         Ryu SDN app — firewall, REST API, flow management
+topology/
+  cloud_topology.py           8-host Mininet 3-tier data center topology
+integration/
+  avro_integration_client.py  Bridge: Mininet stats → AVRO → Ryu flow install
+monitoring/
+  cgroup_cpu_monitor.py       Per-host CPU monitoring via cgroup
+src/scheduler/
+  avro.py                     AVRO optimizer (population, exploration, development)
+  fitness.py                  Multi-metric VM fitness function
+  api.py                      REST API for scheduler (port 5000)
+  baselines.py                LeastLoaded, WeightedRR, FCFS baselines
+  round_robin.py              Round Robin baseline
+  connector.py                Data bridge (simulation ↔ live Mininet)
+  environment.py              Simulation harness for experiments
+  simulation.py               Workload generators (uniform, bursty, gravity)
+  vm_state.py                 Dynamic VM state manager
+src/monitor/
+  resource_monitor.py         VM resource monitoring module
+  openflow_stats.py           OpenFlow port statistics collector
+monitor_server.py             HTTP API wrapper for resource monitor (port 6000)
+dashboard.html                Live network monitoring dashboard
+results/
+  run_experiment.py           Full comparison experiment runner
+  plot_convergence.py         Convergence and distribution plots
+  integration_decisions.csv   Live run decision log
+tests/                        45 unit and integration tests
+```
+
+---
+
+## API Reference
+
+**Scheduler API** (port 5000):
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/schedule` | Submit VM stats, receive scheduling decision |
+| GET | `/api/log` | Retrieve full decision history |
+| GET | `/api/status` | Health check |
+
+**Ryu Controller API** (port 8080):
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/cloud/stats` | All switch stats + host metrics |
+| GET | `/cloud/health` | Health check |
+| POST | `/cloud/assign` | Install forwarding rule for scheduled task |
+
+**Monitor API** (port 6000):
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/vm_stats` | Current VM resource stats |
+| POST | `/api/task_assigned` | Notify task assignment (updates queue) |
+| POST | `/api/task_completed` | Notify task completion (decrements queue) |
+
+---
+
+## VM Stats Data Contract
+
 ```python
 vm_stats = {
-    'vm_id':        int,    # 0, 1, 2, 3
-    'cpu':          float,  # 0.0–1.0
+    'vm_id':        int,    # 0–3
+    'cpu':          float,  # 0.0–1.0 (fraction, not percentage)
     'memory':       float,  # 0.0–1.0
-    'queue_length': int,    # tasks waiting
+    'queue_length': int,    # tasks currently waiting
     'delay':        float,  # milliseconds
     'timestamp':    float   # Unix time
 }
 ```
 
-## Key Methods
-| Method | Who calls it |
-|--------|-------------|
-| `get_all_vm_stats()` | Member 3 (AVRO scheduler) |
-| `task_assigned(vm_id)` | Member 3 after scheduling |
-| `task_completed(vm_id)` | Member 1 after flow completes |
-| `save_to_csv()` | Member 4 (Evaluation) |
-| `update_port_stats(...)` | Member 1's Ryu handler |
+**Note:** `cloud_topology.py` writes CPU as 0–100%. `avro_integration_client.py` converts to 0.0–1.0 fractions automatically before sending to the scheduler.
+
+---
+
+## Fitness Function
+
+```
+Fitness(vm) = 0.4 × (1 − CPU) + 0.3 × (1 − Memory) + 0.2 / (Queue + 1) + 0.1 / (Delay + 1)
+```
+
+Higher score = better candidate for task assignment. Score range: (0, 1].
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `ryu-manager: ALREADY_HANDLED ImportError` | Run the eventlet wsgi.py sed patch above |
+| `ovsdb-server: already running` | OVS is already up — proceed normally |
+| `Stats file not found` | Topology not started yet (Terminal 2) |
+| `AVRO API unreachable` | Start `python src/scheduler/api.py` (Terminal 3) |
+| `Connection refused :8080` | Ryu not started or still initializing |
+| Mininet fails to start | Run `sudo mn -c` then retry |
+| `git branch -a` hangs | Run `git config --global core.pager cat` |
