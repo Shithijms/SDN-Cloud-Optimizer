@@ -39,6 +39,7 @@ def compute_fitness(vm_stats: dict) -> float:
         A VM with cpu=0, memory=0, queue=0, delay=0 scores 1.0 (perfect).
         A VM with cpu=1, memory=1, queue=inf, delay=inf scores near 0.
     """
+
     cpu_score    = 1.0 - vm_stats['cpu']
     mem_score    = 1.0 - vm_stats['memory']
     queue_score  = 1.0 / (vm_stats['queue_length'] + 1)
