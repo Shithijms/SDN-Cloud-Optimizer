@@ -77,8 +77,6 @@ def plot_convergence(ax, num_runs=10):
     ax.set_ylabel('Best Fitness Score', fontsize=11)
     ax.set_title('AVRO Convergence Across Multiple Runs', fontsize=13)
     ax.legend(fontsize=9)
-    ax.set_ylim(0, 1.05)
-    ax.grid(True, alpha=0.3)
 
 
 def plot_vm_selection_distribution(ax, num_tasks=200):
@@ -235,6 +233,16 @@ def plot_vm_fitness_scores(ax):
 def main():
     print("Generating plots...")
 
+    # --- Generate Standalone Fig. 4 ---
+    fig_standalone = plt.figure(figsize=(8, 5))
+    ax_standalone = fig_standalone.add_subplot(111)
+    plot_convergence(ax_standalone)
+    standalone_path = os.path.join(os.path.dirname(__file__), 'fig4_convergence.png')
+    plt.savefig(standalone_path, dpi=300, bbox_inches='tight')
+    plt.close(fig_standalone)
+    print(f"  Standalone Plot 1 done (convergence) -> {standalone_path}")
+    # ----------------------------------
+
     fig = plt.figure(figsize=(16, 12))
     fig.suptitle(
         'AVRO Scheduler Performance Analysis\n'
@@ -253,7 +261,7 @@ def main():
     print("  Plot 4 done (VM fitness scores)")
 
     plot_convergence(ax1)
-    print("  Plot 1 done (convergence)")
+    print("  Plot 1 done (convergence for grid)")
 
     plot_vm_selection_distribution(ax2)
     print("  Plot 2 done (VM selection distribution)")

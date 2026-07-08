@@ -1,0 +1,115 @@
+{
+  "fitness_default": {
+    "caption": "Default 4-VM Fitness Scores \u2014 Bar chart of per-VM fitness (higher is better).",
+    "metrics": {
+      "scores": [
+        0.071408,
+        0.571111,
+        0.35125,
+        0.746667
+      ]
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_default.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_default.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_default.pdf"
+    ]
+  },
+  "avro_vs_rr_default": {
+    "caption": "VM selection distribution and cumulative average fitness over 300 tasks for AVRO vs Round Robin (scenario: default). AVRO final avg fitness=0.747, RR final avg fitness=0.435, improvement=71.6%.",
+    "metrics": {
+      "final_avro": 0.7466670000000019,
+      "final_rr": 0.4351090000000004,
+      "improvement_pct": 71.60458643696204,
+      "avro_counts": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 300
+      },
+      "rr_counts": {
+        "0": 75,
+        "1": 75,
+        "2": 75,
+        "3": 75
+      },
+      "num_tasks": 300
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_default.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_default.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_default.pdf"
+    ]
+  },
+  "avro_convergence_default": {
+    "caption": "AVRO convergence across 8 independent runs (scenario: default). Mean final fitness=0.747 \u00b1 0.000.",
+    "metrics": {
+      "num_runs": 8,
+      "mean_final": 0.746667,
+      "std_final": 0.0
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_default.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_default.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_default.pdf"
+    ]
+  },
+  "fitness_8_vms": {
+    "caption": "Random 8-VM fitness distribution (publication-ready)",
+    "metrics": {
+      "num_vms": 8
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_8_vms.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_8_vms.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\fitness_8_vms.pdf"
+    ]
+  },
+  "avro_vs_rr_8_vms": {
+    "caption": "VM selection distribution and cumulative average fitness over 400 tasks for AVRO vs Round Robin (scenario: 8_vms). AVRO final avg fitness=0.675, RR final avg fitness=0.398, improvement=69.8%.",
+    "metrics": {
+      "final_avro": 0.6750979999999965,
+      "final_rr": 0.3975224999999999,
+      "improvement_pct": 69.82636202982138,
+      "avro_counts": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 400,
+        "5": 0,
+        "6": 0,
+        "7": 0
+      },
+      "rr_counts": {
+        "0": 50,
+        "1": 50,
+        "2": 50,
+        "3": 50,
+        "4": 50,
+        "5": 50,
+        "6": 50,
+        "7": 50
+      },
+      "num_tasks": 400
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_8_vms.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_8_vms.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_vs_rr_8_vms.pdf"
+    ]
+  },
+  "avro_convergence_8_vms": {
+    "caption": "AVRO convergence across 6 independent runs (scenario: 8_vms). Mean final fitness=0.675 \u00b1 0.000.",
+    "metrics": {
+      "num_runs": 6,
+      "mean_final": 0.6750980000000001,
+      "std_final": 1.1102230246251565e-16
+    },
+    "files": [
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_8_vms.png",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_8_vms.svg",
+      "C:\\Users\\Shithij\\CodingProjects\\SDN-Cloud-Optimizer\\results\\avro_convergence_8_vms.pdf"
+    ]
+  }
+}

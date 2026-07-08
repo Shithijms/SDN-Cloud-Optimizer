@@ -9,7 +9,6 @@ Run: python results/run_experiment.py
 
 import sys
 import os
-import matplotlib
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend for plotting
@@ -20,17 +19,18 @@ sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..')))
 
 from src.scheduler.avro        import AVROScheduler
-from src.scheduler.round_robin import RoundRobinScheduler
 from src.scheduler.environment import CloudEnvironment
 from src.scheduler.simulation  import (generate_uniform_workload,
                                         generate_bursty_workload,
                                         generate_gravity_workload)
-from src.scheduler.baselines import LeastLoadedScheduler, WeightedRoundRobinScheduler, FCFS_Scheduler
+from src.scheduler.baselines   import (LeastLoadedScheduler,
+                                        WeightedRoundRobinScheduler,
+                                        FCFS_Scheduler)
 from src.scheduler.round_robin import RoundRobinScheduler
 from src.scheduler.fitness     import compute_fitness
 
-VM_CAPACITIES = [2,4,4,8]
-
+VM_CAPACITIES = [2, 4, 4, 8]  # cpu_cores matching CloudEnvironment
+NUM_EXPERIMENT_RUNS = 5  # run each experiment 5 times, report mean
 
 WORKLOADS = {
     'Uniform':  generate_uniform_workload(200, arrival_rate=2.0),
@@ -38,16 +38,6 @@ WORKLOADS = {
     'Gravity':  generate_gravity_workload(200,  num_vms=4),
 }
 
-
-from src.scheduler.baselines   import (LeastLoadedScheduler,
-                                        WeightedRoundRobinScheduler,
-                                        FCFS_Scheduler)
-from src.scheduler.round_robin import RoundRobinScheduler
-
-
-VM_CAPACITIES = [2, 4, 4, 8]  # cpu_cores matching CloudEnvironment
-
-NUM_EXPERIMENT_RUNS = 5  # run each experiment 5 times, report mean
 
 def run_averaged_experiments():
     """Run each workload/scheduler combination multiple times"""
@@ -103,35 +93,6 @@ def run_averaged_experiments():
 
     return averaged
 
-def run_all_experiments():
-    results = {}
-
-    for workload_name, tasks in WORKLOADS.items():
-        print(f"\n  Running: {workload_name} workload ({len(tasks)} tasks)")
-
-        schedulers = {
-            'AVRO': AVROScheduler(pop_size=10, max_iter=30),
-            'LeastLoaded': LeastLoadedScheduler(),
-            'WeightedRR':  WeightedRoundRobinScheduler(VM_CAPACITIES),
-            'FCFS':        FCFS_Scheduler(),
-            'RoundRobin':  RoundRobinScheduler(num_vms=4),
-        }
-
-        workload_results = {}
-
-        for sched_name, scheduler in schedulers.items():
-            env    = CloudEnvironment(num_vms=4, seed=42)
-            result = env.run_experiment(tasks, scheduler, sched_name)
-            workload_results[sched_name] = result
-
-            print(f"    {sched_name:<14} "
-                  f"fitness={result['avg_fitness']:.4f}  "
-                  f"response={result['avg_response']:.2f}  "
-                  f"makespan={result['makespan']:.1f}")
-
-        results[workload_name] = workload_results
-
-    return results
 
 def print_results_table(results):
     print("\n" + "="*85)
@@ -171,7 +132,15 @@ def print_results_table(results):
                 row   += f"{v:>11.4f}{marker}"[0:13]
 
             print(row)
-
+# --- Added block to print std devs ---
+            print(f"\n  Std deviations ({workload_name}):")
+            for metric_key, metric_label, _ in metrics_to_show:
+                print(f"  {metric_label:<22}", end="")
+                for s in sched_order:
+                    std = results[workload_name][s].get(f'{metric_key}_std', 0)
+                    print(f" {std:>12.4f}", end="")
+                print()
+        # --------------------------------------
         # VM distribution row
         print(f"  {'VM Distribution':<22}", end="")
         for s in sched_order:
@@ -180,18 +149,45 @@ def print_results_table(results):
             print(f" {d:>12}", end="")
         print()
 
-        # AVRO improvement over each baseline
-        print(f"\n  AVRO improvement over baselines ({workload_name}):")
-        avro_fitness = res['AVRO']['avg_fitness']
-        avro_resp    = res['AVRO']['avg_response']
+    # --- NEW: Explicit Format for Paper (Table I) ---
+    print("\n" + "="*85)
+    print("  TABLE I: DECISION QUALITY (DQ) COMPARISON ACROSS WORKLOAD PROFILES")
+    print("="*85)
+    print(f"  {'Algorithm':<18} | {'Uniform':<10} | {'Bursty':<10} | {'Gravity':<10}")
+    print("  " + "-"*65)
+    
+    # Matching exact order and names from the research paper draft
+    table_order = ['AVRO', 'FCFS', 'LeastLoaded', 'RoundRobin', 'WeightedRR']
+    labels = {
+        'AVRO': 'AVRO (proposed)',
+        'FCFS': 'FCFS',
+        'LeastLoaded': 'Least Loaded',
+        'RoundRobin': 'Round Robin',
+        'WeightedRR': 'Weighted RR'
+    }
+    
+    for s in table_order:
+        u_dq = results['Uniform'][s]['decision_quality']
+        b_dq = results['Bursty'][s]['decision_quality']
+        g_dq = results['Gravity'][s]['decision_quality']
+        print(f"  {labels[s]:<18} | {u_dq:<10.4f} | {b_dq:<10.4f} | {g_dq:<10.4f}")
 
-        for s in sched_order[1:]:
-            fit_imp  = (avro_fitness - res[s]['avg_fitness']) / res[s]['avg_fitness'] * 100
-            resp_imp = (res[s]['avg_response'] - avro_resp) / res[s]['avg_response'] * 100
-            print(f"    vs {s:<14} fitness: {fit_imp:>+6.1f}%  "
-                  f"response time: {resp_imp:>+6.1f}%")
+    # --- NEW: Explicit Format for Paper (Section IV-D % Improvements) ---
+    print("\n" + "="*85)
+    print("  SECTION IV-D: EXACT % IMPROVEMENTS (AVRO vs Round Robin)")
+    print("="*85)
+    for wl in ['Uniform', 'Bursty', 'Gravity']:
+        rr_resp = results[wl]['RoundRobin']['avg_response']
+        avro_resp = results[wl]['AVRO']['avg_response']
+        resp_imp = ((rr_resp - avro_resp) / rr_resp) * 100
+        
+        rr_fit = results[wl]['RoundRobin']['avg_fitness']
+        avro_fit = results[wl]['AVRO']['avg_fitness']
+        fit_imp = ((avro_fit - rr_fit) / rr_fit) * 100
+        
+        print(f"  {wl:<10} Workload -> Response Time Improv: {resp_imp:>5.2f}% | Fitness Improv: {fit_imp:>5.2f}%")
+    print("  " + "="*85)
 
-        print("  " + "="*82)
 
 def plot_dynamic_results(results):
     sched_order  = ['AVRO', 'LeastLoaded', 'WeightedRR', 'FCFS', 'RoundRobin']
