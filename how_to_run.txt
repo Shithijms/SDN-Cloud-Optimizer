@@ -1,0 +1,158 @@
+Here's everything step by step.
+
+---
+
+**STEP 1 — Clean up any leftover Mininet state**
+```bash
+sudo mn -c
+```
+
+---
+
+**STEP 2 — Terminal 1 — Start Ryu Controller**
+```bash
+cd ~/ryu/ryu/app && ryu-manager cloud_controller.py --ofp-tcp-listen-port 6633
+```
+Wait for:
+```
+wsgi starting up on http://0.0.0.0:8080
+```
+
+---
+
+**STEP 3 — Terminal 2 — Start Mininet Topology**
+```bash
+sudo python3 ~/majorpro/cloud_topology.py
+```
+Wait for:
+```
+Host stats monitor running -> /tmp/cloud_host_stats.json
+```
+
+step added run this please
+python3 ~/majorpro/experiment_api.py
+---
+
+**STEP 4 — Terminal 3 — Start Member 3's AVRO API**
+```bash
+cd ~/majorpro/SDN-Cloud-Optimizer && python src/scheduler/api.py
+```
+Wait for:
+```
+Scheduler API running on http://0.0.0.0:5000
+```
+
+---
+
+**STEP 5 — Terminal 4 — Start Integration Client**
+```bash
+python3 ~/majorpro/avro_integration_client.py
+```
+Wait for:
+```
+Ryu is up.
+AVRO API is up.
+Starting. Press Ctrl+C to stop.
+```
+
+---
+
+**STEP 6 — Open Dashboard**
+```bash
+xdg-open ~/majorpro/dashboard.html
+```
+Or just open `dashboard.html` in Firefox manually.
+
+---
+
+**STEP 7 — Verify stats file is working**
+
+Open a 5th terminal:
+```bash
+watch -n 2 cat /tmp/cloud_host_stats.json
+```
+All hosts should show real CPU values.
+
+---
+
+**STEP 8 — Demo Scenario 1 — Normal (all hosts free)**
+
+In Mininet CLI (Terminal 2):
+```bash
+killall stress
+```
+Watch Terminal 4 — AVRO distributes across h1, h2, h3, h4.
+
+---
+
+**STEP 9 — Demo Scenario 2 — Two hosts busy**
+
+In Mininet CLI:
+```bash
+h1 stress --cpu 4 &
+h2 stress --cpu 4 &
+```
+Wait 5 seconds. Watch Terminal 4 — AVRO now only picks h3 or h4.
+
+---
+
+**STEP 10 — Demo Scenario 3 — Three hosts busy**
+
+In Mininet CLI:
+```bash
+h3 stress --cpu 4 &
+```
+Now h1, h2, h3 are all busy. Watch Terminal 4 — AVRO picks **only h4** every single time.
+
+---
+
+**STEP 11 — Demo Firewall**
+
+In Mininet CLI:
+```bash
+h1 ping -c5 h5
+```
+Dashboard blocked packets counter goes up. Then:
+```bash
+h1 ping -c5 h2
+```
+This works fine — same tenant.
+
+---
+
+**STEP 12 — Stop stress before next scenario**
+
+In Mininet CLI:
+```bash
+h1 killall stress
+h2 killall stress
+h3 killall stress
+h4 killall stress
+```
+
+---
+
+**STEP 13 — Run the experiment for graphs**
+
+In a new terminal:
+```bash
+cd ~/majorpro/SDN-Cloud-Optimizer && python results/run_experiment.py
+```
+Shows the full AVRO vs Round Robin comparison table and saves the graph.
+
+---
+
+**STEP 14 — Shutdown everything cleanly**
+
+```bash
+# Terminal 4 — Ctrl+C to stop integration client
+# Terminal 3 — Ctrl+C to stop AVRO API
+# Terminal 2 — type exit in Mininet CLI
+exit
+# Terminal 1 — Ctrl+C to stop Ryu
+# Then clean up
+sudo mn -c
+```
+
+---
+

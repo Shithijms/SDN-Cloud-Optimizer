@@ -1,0 +1,6 @@
+Algorithm,Makespan(s),AvgResponse(ms),Tasks,AvgCPU%
+Round Robin,20.6,21.8,50,12.1
+Least Loaded,20.58,19.5,50,0
+FCFS,20.56,19.6,50,23.8
+Weighted RR,20.17,18.4,50,0
+AVRO,20.78,32.6,50,0
