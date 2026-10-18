@@ -9,6 +9,7 @@ Run: python results/run_experiment.py
 
 import sys
 import os
+import random
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend for plotting
@@ -47,6 +48,8 @@ def run_averaged_experiments():
 
     for run in range(NUM_EXPERIMENT_RUNS):
         print(f"\n  Run {run+1}/{NUM_EXPERIMENT_RUNS}")
+        random.seed(run)
+        np.random.seed(run)
         # Regenerate workloads each run for variance
         workloads = {
             'Uniform': generate_uniform_workload(200, arrival_rate=2.0),
@@ -56,7 +59,8 @@ def run_averaged_experiments():
 
         for workload_name, tasks in workloads.items():
             schedulers = {
-                'AVRO':        AVROScheduler(pop_size=10, max_iter=30),
+                'AVRO':        AVROScheduler(
+                    pop_size=10, max_iter=30, threshold=0.3),
                 'LeastLoaded': LeastLoadedScheduler(),
                 'WeightedRR':  WeightedRoundRobinScheduler(VM_CAPACITIES),
                 'FCFS':        FCFS_Scheduler(),

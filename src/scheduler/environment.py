@@ -16,10 +16,10 @@ Mininet stats requires only changing get_vm_stats_list().
 
 import time
 import numpy as np
-from src.scheduler.vm_state    import VMState
-from src.scheduler.avro        import AVROScheduler
-from src.scheduler.round_robin import RoundRobinScheduler
-from src.scheduler.fitness     import compute_fitness
+from .vm_state    import VMState
+from .avro        import AVROScheduler
+from .round_robin import RoundRobinScheduler
+from .fitness     import compute_fitness
 
 
 class CloudEnvironment:

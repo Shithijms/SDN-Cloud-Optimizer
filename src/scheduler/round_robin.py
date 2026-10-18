@@ -8,7 +8,7 @@ any real-time resource metrics. This blind distribution is the
 core weakness we demonstrate AVRO overcomes.
 """
 
-from src.scheduler.fitness import compute_fitness
+from .fitness import compute_fitness
 
 
 class RoundRobinScheduler:

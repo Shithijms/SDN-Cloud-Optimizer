@@ -10,7 +10,7 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), '..')))
 
-import src.scheduler.fitness as fit
+from src.scheduler import fitness as fit
 from src.scheduler.avro import AVROScheduler
 from src.scheduler.environment import CloudEnvironment
 from src.scheduler.simulation import (

@@ -100,7 +100,7 @@ def plot_vm_fitness_scores(vm_stats, labels=None, out_path=None, title=None):
 
 def compare_avro_vs_rr(vm_stats, num_tasks=300, name='default'):
     """Generate two-panel plot: distribution + cumulative average fitness."""
-    avro = AVROScheduler()
+    avro = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
     rr = RoundRobinScheduler(num_vms=len(vm_stats))
 
     avro_counts = {i: 0 for i in range(len(vm_stats))}
@@ -176,9 +176,9 @@ def compare_avro_vs_rr(vm_stats, num_tasks=300, name='default'):
     plt.close(fig)
 
 
-def avro_convergence(vm_stats, num_runs=8, name='default'):
+def avro_convergence(vm_stats, num_runs=10, name='default'):
     """Plot AVRO convergence curves over multiple runs."""
-    scheduler = AVROScheduler()
+    scheduler = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
     histories = []
     for _ in range(num_runs):
         _, history = scheduler.select_vm(vm_stats, track_convergence=True)
@@ -215,6 +215,102 @@ def avro_convergence(vm_stats, num_runs=8, name='default'):
         f'Mean final fitness={metrics["mean_final"]:.3f} ± {metrics["std_final"]:.3f}.'
     )
     register_figure(os.path.basename(base), caption, metrics, saved)
+    plt.close(fig)
+
+
+def plot_combined_default_figure(vm_stats, num_runs=10, num_tasks=300):
+    """Merge convergence and AVRO-vs-RR selection evidence into one figure."""
+    convergence_scheduler = AVROScheduler(
+        pop_size=10, max_iter=30, threshold=0.3)
+    histories = []
+    for _ in range(num_runs):
+        _, history = convergence_scheduler.select_vm(
+            vm_stats, track_convergence=True)
+        histories.append(history)
+
+    avro = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
+    rr = RoundRobinScheduler(num_vms=len(vm_stats))
+    avro_counts = np.zeros(len(vm_stats), dtype=int)
+    rr_counts = np.zeros(len(vm_stats), dtype=int)
+    avro_cumulative = []
+    rr_cumulative = []
+    avro_total = rr_total = 0.0
+    for task in range(1, num_tasks + 1):
+        avro_vm = avro.select_vm(vm_stats)
+        rr_vm = rr.select_vm(vm_stats)
+        avro_counts[avro_vm] += 1
+        rr_counts[rr_vm] += 1
+        avro_total += compute_fitness(vm_stats[avro_vm])
+        rr_total += compute_fitness(vm_stats[rr_vm])
+        avro_cumulative.append(avro_total / task)
+        rr_cumulative.append(rr_total / task)
+
+    fig, (ax_convergence, ax_distribution) = plt.subplots(
+        1, 2, figsize=(7.0, 3.15), gridspec_kw={'width_ratios': [1, 1.15]})
+    histories = np.asarray(histories)
+    iterations = np.arange(1, convergence_scheduler.max_iter + 1)
+    mean_history = histories.mean(axis=0)
+    std_history = histories.std(axis=0)
+    ax_convergence.plot(iterations, mean_history, color='steelblue', lw=1.8,
+                        label=f'AVRO mean (n={num_runs})')
+    ax_convergence.fill_between(
+        iterations, mean_history - std_history, mean_history + std_history,
+        color='steelblue', alpha=.18, label='±1 SD')
+    ax_convergence.set_title('(a) AVRO convergence')
+    ax_convergence.set_xlabel('Iteration (MaxIter = 30)')
+    ax_convergence.set_ylabel('Best fitness')
+    ax_convergence.set_ylim(0, 1.02)
+    ax_convergence.grid(alpha=.25)
+    ax_convergence.legend(fontsize=7)
+
+    positions = np.arange(len(vm_stats))
+    width = .36
+    ax_distribution.bar(positions - width / 2, avro_counts, width,
+                        color='steelblue', label='AVRO selections')
+    ax_distribution.bar(positions + width / 2, rr_counts, width,
+                        color='salmon', alpha=.8, label='Round Robin selections')
+    ax_distribution.set_title('(b) Live-choice policy comparison')
+    ax_distribution.set_xlabel('VM index')
+    ax_distribution.set_ylabel('Selections')
+    ax_distribution.set_xticks(positions)
+    ax_distribution.grid(axis='y', alpha=.25)
+    ax_fitness = ax_distribution.twinx()
+    task_axis = np.arange(1, num_tasks + 1)
+    ax_fitness.plot(task_axis, avro_cumulative, color='navy', lw=1.5,
+                    label='AVRO cumulative fitness')
+    ax_fitness.plot(task_axis, rr_cumulative, color='darkred', lw=1.4,
+                    ls='--', label='RR cumulative fitness')
+    ax_fitness.set_ylabel('Cumulative fitness')
+    ax_fitness.set_ylim(0, 1)
+    handles, labels = ax_distribution.get_legend_handles_labels()
+    handles2, labels2 = ax_fitness.get_legend_handles_labels()
+    ax_distribution.legend(handles + handles2, labels + labels2,
+                           fontsize=6.5, loc='best')
+
+    improvement = (
+        (avro_cumulative[-1] - rr_cumulative[-1]) / rr_cumulative[-1] * 100
+        if rr_cumulative[-1] else 0.0)
+    caption = (
+        f'Panels (a-b): AVRO convergence and AVRO vs Round Robin under the '
+        f'default synthetic 4-VM scenario; MaxIter=30, threshold=0.3, '
+        f'{num_runs} convergence runs and {num_tasks} scheduling decisions. '
+        f'Cumulative-fitness improvement={improvement:.1f}%.')
+    fig.suptitle('AVRO convergence and scheduling comparison', fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, .93))
+    out_dir = ensure_results_dir()
+    base = os.path.join(out_dir, 'fig4_fig5_combined')
+    saved = save_figure_formats(fig, base, dpi=300)
+    register_figure('fig4_fig5_combined', caption, {
+        'max_iter': 30,
+        'threshold': 0.3,
+        'convergence_runs': num_runs,
+        'comparison_tasks': num_tasks,
+        'avro_vm_counts': avro_counts.tolist(),
+        'rr_vm_counts': rr_counts.tolist(),
+        'avro_final_fitness': avro_cumulative[-1],
+        'rr_final_fitness': rr_cumulative[-1],
+        'improvement_pct': improvement,
+    }, saved)
     plt.close(fig)
 
 
@@ -285,8 +381,7 @@ def many_vms_random(num_vms=8, name='many_vms'):
         })
 
     out_dir = ensure_results_dir()
-    base = os.path.join(out_dir, f'fitness_{name}')
-    fig = plot_vm_fitness_scores(vm_stats, labels=[f'VM{i}' for i in range(num_vms)],
+            convergence_scheduler = AVROScheduler(pop_size=5, max_iter=15)
                                  out_path=None,
                                  title=f'Random {num_vms}-VM Fitness')
     # If plot_vm_fitness_scores returned a figure, save it via helper
@@ -298,7 +393,7 @@ def many_vms_random(num_vms=8, name='many_vms'):
         plt.close(fig)
 
     compare_avro_vs_rr(vm_stats, num_tasks=400, name=name)
-    avro_convergence(vm_stats, num_runs=6, name=name)
+    avro_convergence(vm_stats, num_runs=10, name=name)
 
 
 def save_figure_formats(fig, base, formats=EXPORT_FORMATS, dpi=150):
@@ -363,8 +458,7 @@ def main():
                            labels=['VM0', 'VM1', 'VM2', 'VM3'],
                            out_path=os.path.join(out_dir, 'fitness_default.png'),
                            title='Default 4-VM Fitness Scores')
-    compare_avro_vs_rr(DEFAULT_VM_STATS, num_tasks=300, name='default')
-    avro_convergence(DEFAULT_VM_STATS, num_runs=8, name='default')
+    plot_combined_default_figure(DEFAULT_VM_STATS, num_runs=10, num_tasks=300)
 
     # Classic 3-VM scenario from fitness tests
     plot_vm_fitness_scores(CLASSIC_3_VMS,
@@ -372,7 +466,7 @@ def main():
                            out_path=os.path.join(out_dir, 'fitness_classic3.png'),
                            title='Classic 3-VM Fitness Scores')
     compare_avro_vs_rr(CLASSIC_3_VMS, num_tasks=250, name='classic3')
-    avro_convergence(CLASSIC_3_VMS, num_runs=6, name='classic3')
+    avro_convergence(CLASSIC_3_VMS, num_runs=10, name='classic3')
 
     # Many-VM random scenario
     many_vms_random(8, name='8_vms')
@@ -403,7 +497,7 @@ if __name__ == '__main__':
                                out_path=os.path.join(out_dir, 'fitness_default.png'),
                                title='Default 4-VM Fitness Scores')
         compare_avro_vs_rr(DEFAULT_VM_STATS, num_tasks=300, name='default')
-        avro_convergence(DEFAULT_VM_STATS, num_runs=8, name='default')
+        plot_combined_default_figure(DEFAULT_VM_STATS, num_runs=10, num_tasks=300)
         many_vms_random(8, name='8_vms')
         write_metadata(out_dir)
     else:

@@ -58,7 +58,7 @@ def divider(char='─', width=60):
 
 def run_scenario(name, vm_stats):
     """Run AVRO vs RR comparison for one scenario"""
-    avro = AVROScheduler(pop_size=10, max_iter=100)
+    avro = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
     rr   = RoundRobinScheduler(num_vms=len(vm_stats))
 
     avro_fitness_list = []
@@ -97,7 +97,7 @@ def print_header():
     print("  SDN-Based Intelligent Load Balancing and Task Scheduling")
     print("  Sahyadri College of Engineering & Management — CS23")
     divider('═')
-    print(f"  Configuration: pop_size=10, max_iter=100, tasks={NUM_TASKS}")
+    print(f"  Configuration: pop_size=10, max_iter=30, threshold=0.3, tasks={NUM_TASKS}")
     print()
 
 
@@ -178,7 +178,7 @@ def print_convergence_stats():
     divider()
 
     vm_stats  = SCENARIOS["One Overloaded"]
-    scheduler = AVROScheduler(pop_size=10, max_iter=100)
+    scheduler = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
 
     final_fitness_values = []
     convergence_points   = []
@@ -203,7 +203,7 @@ def print_convergence_stats():
     print(f"  Runs analyzed:          {NUM_RUNS}")
     print(f"  Mean final fitness:     {mean_final:.4f}")
     print(f"  Std dev (stability):    {std_final:.6f}")
-    print(f"  Avg convergence point:  iteration {mean_conv:.1f}/100")
+    print(f"  Avg convergence point:  iteration {mean_conv:.1f}/30")
     print(f"  Consistency:            "
           f"{'Excellent' if std_final < 0.01 else 'Good' if std_final < 0.05 else 'Variable'}")
     divider()

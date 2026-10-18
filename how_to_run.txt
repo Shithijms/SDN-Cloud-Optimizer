@@ -1,0 +1,179 @@
+SDN Cloud Optimizer - Run Guide
+===============================
+
+Use one terminal per long-running service. Do not start the topology twice.
+The project uses Python 3.11 in .venv because Ryu is not compatible with the
+system Python 3.14 environment.
+
+STEP 1 - Clean up before a new run
+-----------------------------------
+
+Only run this after stopping the Mininet CLI with "exit":
+
+    cd ~/SDN-Cloud-Optimizer
+    sudo mn -c
+
+If the topology is already running and /tmp/cloud_host_stats.json contains h1
+through h8, skip this step and do not start another topology.
+
+STEP 2 - Terminal 1: start Ryu
+------------------------------
+
+    cd ~/SDN-Cloud-Optimizer
+    .venv/bin/ryu-manager cloud-sdn-avro/controller/cloud_contoller.py --ofp-tcp-listen-port 6633
+
+Wait for:
+
+    wsgi starting up on http://0.0.0.0:8080
+
+Leave this terminal open.
+
+STEP 3 - Terminal 2: start Mininet
+----------------------------------
+
+    cd ~/SDN-Cloud-Optimizer
+    sudo python3 cloud_topology.py
+
+Wait for:
+
+    Host stats monitor running -> /tmp/cloud_host_stats.json
+
+CPU values are collected from each host's network namespace, including
+background workloads such as `h1 stress --cpu 4 &`. Restart Mininet after
+changing the topology monitor code so the updated collector is loaded.
+
+Leave the Mininet CLI open. If you see "RTNETLINK answers: File exists",
+the topology is already running or stale state remains. Do not retry the
+topology immediately: type "exit" in the existing Mininet CLI, then run
+"sudo mn -c" and start it once.
+
+STEP 4 - Terminal 3: start the AVRO scheduler
+-----------------------------------------------
+
+Only run this command if port 5000 is not already serving the scheduler:
+
+    curl http://127.0.0.1:5000/api/status
+
+If it returns a JSON status response, the scheduler is already running. Do not
+start a second copy. If it is stopped, run it as a package module so relative
+imports resolve correctly:
+
+    cd ~/SDN-Cloud-Optimizer
+    .venv/bin/python -m src.scheduler.api
+
+Wait for:
+
+    Scheduler API running on http://0.0.0.0:5000
+
+STEP 5 - Terminal 4: start the experiment API
+----------------------------------------------
+
+    cd ~/SDN-Cloud-Optimizer
+    .venv/bin/python experiment_api.py
+
+This runs on http://localhost:9000. Leave the terminal open.
+
+STEP 6 - Terminal 5: start the integration client
+--------------------------------------------------
+
+    cd ~/SDN-Cloud-Optimizer
+    .venv/bin/python avro_integration_client.py
+
+Wait for:
+
+    Ryu is up.
+    AVRO API is up.
+    Starting. Press Ctrl+C to stop.
+
+STEP 7 - Open the dashboard
+---------------------------
+
+For a stable HTTP session, use Python's static server instead of the VS Code
+preview server on port 5500. The VS Code preview server watches files and can
+reload the page automatically:
+
+    cd ~/SDN-Cloud-Optimizer
+    python3 -m http.server 8000 --bind 127.0.0.1
+
+Open http://127.0.0.1:8000/dashboard.html. Keep that terminal open. Stop it
+with Ctrl+C when finished.
+
+You can also open the file directly:
+
+    xdg-open dashboard.html
+
+Optional stats check from another terminal:
+
+    watch -n 2 cat /tmp/cloud_host_stats.json
+
+Live resource-based AVRO vs Round Robin plot
+---------------------------------------------
+
+One command can start/reuse Ryu, the scheduler, and experiment API; start
+Mininet headlessly with real CPU load on h1-h4; wait for live host and switch
+stats; capture the graph; and clean up only the services it started:
+
+    cd ~/SDN-Cloud-Optimizer
+    sudo .venv/bin/python run_live_plot.py --samples 100 --interval 1
+
+The topology still contains eight hosts. The live report deliberately compares
+only the four Tenant A VMs (h1-h4), matching the paper's 4-VM figure.
+
+Matplotlib and the other packages in requirements.txt must already be installed
+in .venv before this command starts Mininet. The launcher checks that first.
+It checks for an existing Mininet topology, cleans stale Mininet state before
+starting Ryu (Mininet cleanup can kill Ryu), and will not clean a topology that
+is already running.
+Use --skip-mininet only when a topology is already running and its live stats
+are fresh. Use --no-cleanup to leave services started by the launcher running.
+
+Outputs are saved as results/live_mininet_<timestamp>.png, .csv, and .json.
+The plotter requires fresh Mininet host stats and live Ryu and AVRO APIs; it
+does not substitute predefined or demo VM metrics. Each sample requests an
+AVRO decision and installs both AVRO and Round Robin flows through Ryu.
+
+To capture from already-running services without starting or stopping
+Mininet:
+
+    .venv/bin/python results/plot_convergence.py --samples 100 --interval 1
+
+Demo commands in the Mininet CLI
+---------------------------------
+
+Normal load:
+
+    killall stress
+
+Two busy hosts:
+
+    h1 stress --cpu 4 &
+    h2 stress --cpu 4 &
+
+Three busy hosts:
+
+    h3 stress --cpu 4 &
+
+Firewall check:
+
+    h1 ping -c5 h5
+    h1 ping -c5 h2
+
+Stop stress:
+
+    h1 killall stress
+    h2 killall stress
+    h3 killall stress
+    h4 killall stress
+
+The experiment API dashboard can run simulations through its controls. The
+documented results/run_experiment.py file is not present in this checkout.
+
+Shutdown
+--------
+
+1. Press Ctrl+C in the integration, scheduler, and experiment terminals.
+2. Type "exit" in the Mininet CLI.
+3. Stop Ryu with Ctrl+C.
+4. Clean remaining Mininet state:
+
+    sudo mn -c

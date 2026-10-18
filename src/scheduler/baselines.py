@@ -15,7 +15,7 @@ Algorithms:
 """
 
 import numpy as np
-from src.scheduler.fitness import compute_fitness
+from .fitness import compute_fitness
 
 
 # ── 1. Least Loaded ─────────────────────────────────────────────

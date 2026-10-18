@@ -16,12 +16,12 @@ Leader      = VM index with highest fitness in current population
 
 import numpy as np
 import math
-from src.scheduler.fitness import compute_fitness, rank_vms
+from .fitness import compute_fitness, rank_vms
 
 
-# ── Algorithm parameters (Table 3 from paper) ──────────────────
+# ── Algorithm parameters  ──────────────────
 POP_SIZE   = 10       # population size
-MAX_ITER   = 100      # maximum iterations
+MAX_ITER   = 30       # paper configuration for main experiments
 T_TRAIN    = 70       # iteration when optimization stage starts
 GAMMA      = 2        # controls satiety baseline (Eq. 16)
 DELTA2     = 0.0001   # limits F range in optimization stage (Eq. 36)
@@ -34,11 +34,8 @@ L2         = 0.4      # probability of selecting Best2 as leader
 
 class AVROScheduler:
 
-    def __init__(self,
-                 pop_size=POP_SIZE,
-                 max_iter=MAX_ITER,
-                 t_train=T_TRAIN,
-                 threshold=0.3):
+    def __init__(self, pop_size=POP_SIZE, max_iter=MAX_ITER,
+                 t_train=T_TRAIN, threshold=0.3):
         self.pop_size = pop_size
         self.max_iter = max_iter
         self.t_train  = t_train
@@ -46,43 +43,11 @@ class AVROScheduler:
         self.selection_count = 0
         self.fast_path_count = 0
 
-    # ────────────────────────────────────────────────────────────
-    # STAGE 1A — Population Initialization
-    # ────────────────────────────────────────────────────────────
-
     def initialize_population(self, num_vms: int) -> np.ndarray:
-        """
-        Equation 12 from paper — random initialization.
-
-        Each element is a VM index (integer 0 to num_vms-1).
-        Population size = self.pop_size candidate solutions.
-
-        Parameters
-        ----------
-        num_vms : int — number of available VMs
-
-        Returns
-        -------
-        np.ndarray of shape (pop_size,) with integer VM indices
-        """
         population = np.random.randint(0, num_vms, self.pop_size)
         return population
 
-    def compute_population_fitness(self,
-                                   population: np.ndarray,
-                                   vm_stats_list: list) -> np.ndarray:
-        """
-        Compute fitness for every member of the population.
-
-        Parameters
-        ----------
-        population     : np.ndarray — array of VM indices
-        vm_stats_list  : list of dicts — real-time stats per VM
-
-        Returns
-        -------
-        np.ndarray of fitness scores, same length as population
-        """
+    def compute_population_fitness(self, population: np.ndarray,vm_stats_list: list) -> np.ndarray:
         num_vms = len(vm_stats_list)
         fitness_scores = np.zeros(self.pop_size)
 
@@ -332,7 +297,7 @@ class AVROScheduler:
         Fast path using relative fitness scoring.
         Handles saturated scenarios where all VMs are overloaded.
         """
-        from src.scheduler.fitness import compute_relative_fitness
+        from .fitness import compute_relative_fitness
         ranking = compute_relative_fitness(vm_stats_list)
 
         if len(ranking) < 2:

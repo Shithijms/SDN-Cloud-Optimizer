@@ -42,7 +42,7 @@ def diagnose():
     print("  " + "-"*75)
 
     env   = CloudEnvironment(num_vms=4, seed=42)
-    avro  = AVROScheduler(pop_size=10, max_iter=30)
+    avro  = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
     tasks_sorted = sorted(tasks, key=lambda t: t['arrival_time'])
 
     wrong_decisions = 0

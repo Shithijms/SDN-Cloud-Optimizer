@@ -26,22 +26,8 @@ TASK_PROFILES = {
 }
 
 
-def generate_task(task_id: int,
-                  arrival_time: float,
-                  profile: str = None) -> dict:
-    """
-    Generate a single task.
+def generate_task(task_id: int, arrival_time: float, profile: str = None) -> dict:
 
-    Parameters
-    ----------
-    task_id      : int
-    arrival_time : float — simulation time when task arrives
-    profile      : str or None — if None, randomly chosen
-
-    Returns
-    -------
-    dict — task specification
-    """
     if profile is None:
         # Realistic distribution — most tasks are small/medium
         profile = random.choices(

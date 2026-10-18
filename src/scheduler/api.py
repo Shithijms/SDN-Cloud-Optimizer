@@ -13,22 +13,44 @@ import json
 import time
 import sys
 import os
+import threading
 
 import urllib.request
 
 sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.scheduler.avro        import AVROScheduler
-from src.scheduler.round_robin import RoundRobinScheduler
-from src.scheduler.baselines   import LeastLoadedScheduler
+from .avro        import AVROScheduler
+from .round_robin import RoundRobinScheduler
+from .baselines   import LeastLoadedScheduler
 
 
 # Active scheduler — swap this to compare algorithms
-ACTIVE_SCHEDULER = AVROScheduler(pop_size=5, max_iter=30)
+ACTIVE_SCHEDULER = AVROScheduler(pop_size=10, max_iter=30, threshold=0.3)
 
 # Decision log — Member 4 reads this
 decision_log = []
+active_task_reservations = {}
+reservation_lock = threading.Lock()
+
+
+def apply_task_reservations(vm_stats_list, task):
+    now = time.monotonic()
+    effective_vms = [dict(vm) for vm in vm_stats_list]
+    duration = max(0.0, float(task.get('duration', 0.0))) if task else 0.0
+    cpu_demand = max(0.0, float(task.get('cpu_demand', 0.0))) if task else 0.0
+    mem_demand = max(0.0, float(task.get('mem_demand', 0.0))) if task else 0.0
+
+    with reservation_lock:
+        for vm_id, vm in enumerate(effective_vms):
+            active = [reservation for reservation in active_task_reservations.get(vm_id, [])
+                      if reservation['expires_at'] > now]
+            active_task_reservations[vm_id] = active
+            vm['cpu'] = min(0.98, float(vm['cpu']) + sum(r['cpu_demand'] for r in active))
+            vm['memory'] = min(0.98, float(vm['memory']) + sum(r['mem_demand'] for r in active))
+            vm['queue_length'] = int(vm.get('queue_length', 0)) + len(active)
+
+    return effective_vms, duration, cpu_demand, mem_demand
 
 
 class SchedulerHandler(BaseHTTPRequestHandler):
@@ -50,14 +72,36 @@ class SchedulerHandler(BaseHTTPRequestHandler):
     def _handle_schedule(self):
         content_length = int(self.headers['Content-Length'])
         body           = self.rfile.read(content_length)
-        vm_stats_list  = json.loads(body)
+        request_body = json.loads(body)
+        if isinstance(request_body, dict):
+            vm_stats_list = request_body.get('vms', [])
+            task = request_body.get('task', {})
+        else:
+            vm_stats_list = request_body
+            task = {}
+        if not vm_stats_list:
+            self.send_error(400, 'vm_stats must contain at least one VM')
+            return
+
+        effective_vms, duration, cpu_demand, mem_demand = apply_task_reservations(
+            vm_stats_list, task)
 
         start_time     = time.time()
-        selected_vm_id = ACTIVE_SCHEDULER.select_vm(vm_stats_list)
+        selected_vm_id = ACTIVE_SCHEDULER.select_vm(effective_vms)
         decision_ms    = (time.time() - start_time) * 1000
 
-        from src.scheduler.fitness import compute_fitness
-        fitness = compute_fitness(vm_stats_list[selected_vm_id])
+        from .fitness import compute_fitness
+        fitness = compute_fitness(effective_vms[selected_vm_id])
+
+        if duration > 0:
+            with reservation_lock:
+                active_task_reservations.setdefault(selected_vm_id, []).append({
+                    'expires_at': time.monotonic() + duration,
+                    'cpu_demand': cpu_demand,
+                    'mem_demand': mem_demand,
+                    'task_id': task.get('task_id'),
+                    'profile': task.get('profile', 'unspecified'),
+                })
 
         notify_success = self._notify_task_assigned(selected_vm_id) 
 
@@ -65,17 +109,22 @@ class SchedulerHandler(BaseHTTPRequestHandler):
             'selected_vm_id': selected_vm_id,
             'fitness_score':  round(fitness, 4),
             'decision_ms':    round(decision_ms, 2),
+            'task_profile': task.get('profile'),
+            'task_cpu_demand': cpu_demand,
+            'task_mem_demand': mem_demand,
+            'task_duration': duration,
+            'effective_vm_stats': effective_vms[selected_vm_id],
             'timestamp':      time.time(),
         }
 
-        decision_log.append({**response, 'vm_stats': vm_stats_list})
+        decision_log.append({**response, 'vm_stats': effective_vms})
 
         # Log slow decisions
         if decision_ms > 50:
             print(f"  SLOW decision: {decision_ms:.1f}ms for VM{selected_vm_id}")
         else:
             print(f"  [{time.strftime('%H:%M:%S')}] "
-                  f"VM{selected_vm_id} selected "
+                f"VM{selected_vm_id} selected for {task.get('profile', 'task')} "
                   f"(fitness={fitness:.3f}, {decision_ms:.1f}ms)")
 
         self._send_json(response)

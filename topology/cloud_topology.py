@@ -18,6 +18,7 @@ import time
 import threading
 import json
 import signal
+import os
 
 MONITOR_FILE = '/tmp/cloud_host_stats.json'
 RUNNING = True
@@ -31,26 +32,31 @@ signal.signal(signal.SIGINT, signal_handler)
 # ── Per-PID CPU reader ────────────────────────────────────────────────────────
 def _read_pid_cpu(pid):
     """
-    Read CPU usage for a PID and ALL its descendants.
-    Needed because stress forks child workers — the shell PID
-    itself shows 0% but its children consume the actual CPU.
+    Read CPU usage for all processes in the host's network namespace.
+    Background commands can be reparented to PID 1, so descendant-only
+    accounting misses workloads started with `h1 stress ... &`.
     """
-    def get_all_pids(root_pid):
-        """Walk process tree and collect all descendant PIDs."""
-        pids = [root_pid]
+    def get_namespace_pids(root_pid):
+        """Find all processes belonging to this Mininet host namespace."""
         try:
-            children_file = f'/proc/{root_pid}/task/{root_pid}/children'
-            with open(children_file, 'r') as f:
-                children = f.read().split()
-            for child_pid in children:
-                pids.extend(get_all_pids(int(child_pid)))
+            namespace = os.readlink(f'/proc/{root_pid}/ns/net')
         except Exception:
-            pass
-        return pids
+            return [root_pid]
+
+        pids = []
+        for entry in os.listdir('/proc'):
+            if not entry.isdigit():
+                continue
+            try:
+                if os.readlink(f'/proc/{entry}/ns/net') == namespace:
+                    pids.append(int(entry))
+            except Exception:
+                pass
+        return pids or [root_pid]
 
     def read_tree_ticks(root_pid):
         """Sum utime+stime across all PIDs in the tree."""
-        all_pids = get_all_pids(root_pid)
+        all_pids = get_namespace_pids(root_pid)
         total_proc_ticks = 0
         for p in all_pids:
             try:
