@@ -1015,6 +1015,9 @@ async function pollExpAPI(){
     updateSessionMode();
     document.getElementById('apiDot').className='pulse dead';
     document.getElementById('apiLabel').textContent='Exp API ✗';
+  }
+}
+
   // ------------------------------ CONFIG ------------------------------
   const CONFIG = {
     apiUrl: 'http://localhost:8080/cloud/stats',
@@ -1225,7 +1228,6 @@ async function pollExpAPI(){
     if (!logs.length) { els.blockLogList.innerHTML = '<div>✅ No blocked packets</div>'; return; }
     els.blockLogList.innerHTML = logs.slice().reverse().map(l => `<div class="log-item"><span style="color:var(--warn)">⛔ ${l.rule}</span><br><span class="log-ips">${l.src_ip} → ${l.dst_ip} [sw${l.switch}] at ${l.time}</span></div>`).join('');
   }
-}
 
 // ═══════════════════════════════════════
 // POLL RYU (real network stats)
