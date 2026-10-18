@@ -8,6 +8,7 @@ Stage 1: Population, Leader Selection, Satiety.
 import sys
 import os
 import numpy as np
+from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.scheduler.avro import AVROScheduler
@@ -265,6 +266,28 @@ def test_select_vm_returns_valid_index():
         f"VM index {result} out of range [0, {len(VM_STATS)})"
     )
 
+def test_fast_select_uses_configured_threshold():
+    ranking = [(2, 0.7), (1, 0.4), (0, 0.1)]
+    with patch('src.scheduler.fitness.compute_relative_fitness',
+               return_value=ranking):
+        lower_threshold = AVROScheduler(threshold=0.2)
+        higher_threshold = AVROScheduler(threshold=0.4)
+
+        assert lower_threshold._fast_select(VM_STATS, 0.2) == 2
+        assert higher_threshold._fast_select(VM_STATS, 0.4) is None
+
+
+def test_fast_path_counter_tracks_loop_skips():
+    scheduler = AVROScheduler(threshold=0.2)
+    ranking = [(2, 0.7), (1, 0.4), (0, 0.1)]
+
+    with patch('src.scheduler.fitness.compute_relative_fitness',
+               return_value=ranking):
+        assert scheduler.select_vm(VM_STATS) == 2
+
+    assert scheduler.selection_count == 1
+    assert scheduler.fast_path_count == 1
+
 
 def test_select_vm_avoids_overloaded():
     """
@@ -392,6 +415,8 @@ def run_all_tests():
         test_exploration_moves_population,
         test_exploration_diversity,
         test_select_vm_returns_valid_index,
+        test_fast_select_uses_configured_threshold,
+        test_fast_path_counter_tracks_loop_skips,
         test_select_vm_avoids_overloaded,
         test_select_vm_single_vm,
         test_select_vm_empty_raises,
@@ -426,4 +451,3 @@ def run_all_tests():
 if __name__ == "__main__":
     success = run_all_tests()
     sys.exit(0 if success else 1)
-

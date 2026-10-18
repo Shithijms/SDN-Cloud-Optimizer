@@ -30,7 +30,7 @@ from src.scheduler.round_robin import RoundRobinScheduler
 from src.scheduler.fitness     import compute_fitness
 
 VM_CAPACITIES = [2, 4, 4, 8]  # cpu_cores matching CloudEnvironment
-NUM_EXPERIMENT_RUNS = 5  # run each experiment 5 times, report mean
+NUM_EXPERIMENT_RUNS = 10  # repetitions per workload/scheduler combination
 
 WORKLOADS = {
     'Uniform':  generate_uniform_workload(200, arrival_rate=2.0),
@@ -132,15 +132,13 @@ def print_results_table(results):
                 row   += f"{v:>11.4f}{marker}"[0:13]
 
             print(row)
-# --- Added block to print std devs ---
-            print(f"\n  Std deviations ({workload_name}):")
-            for metric_key, metric_label, _ in metrics_to_show:
-                print(f"  {metric_label:<22}", end="")
-                for s in sched_order:
-                    std = results[workload_name][s].get(f'{metric_key}_std', 0)
-                    print(f" {std:>12.4f}", end="")
-                print()
-        # --------------------------------------
+        print(f"\n  Std deviations ({workload_name}):")
+        for metric_key, metric_label, _ in metrics_to_show:
+            print(f"  {metric_label:<22}", end="")
+            for s in sched_order:
+                std = res[s].get(f'{metric_key}_std', 0)
+                print(f" {std:>12.4f}", end="")
+            print()
         # VM distribution row
         print(f"  {'VM Distribution':<22}", end="")
         for s in sched_order:

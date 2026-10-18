@@ -25,7 +25,7 @@ from src.scheduler.baselines   import LeastLoadedScheduler
 
 
 # Active scheduler — swap this to compare algorithms
-ACTIVE_SCHEDULER = AVROScheduler(pop_size=5, max_iter=15)
+ACTIVE_SCHEDULER = AVROScheduler(pop_size=5, max_iter=30)
 
 # Decision log — Member 4 reads this
 decision_log = []

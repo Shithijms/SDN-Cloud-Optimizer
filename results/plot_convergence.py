@@ -36,13 +36,18 @@ VM_LABELS = [
     'VM3\n(Best)',
 ]
 
+CONVERGENCE_MAX_ITER = 300
+
 
 def plot_convergence(ax, num_runs=10):
     """
     Plot 1 — AVRO convergence curves over multiple runs.
     Shows algorithm stability.
     """
-    scheduler = AVROScheduler(pop_size=10, max_iter=100)
+    scheduler = AVROScheduler(
+        pop_size=10,
+        max_iter=CONVERGENCE_MAX_ITER,
+    )
     all_histories = []
 
     for _ in range(num_runs):
@@ -53,7 +58,7 @@ def plot_convergence(ax, num_runs=10):
     history_array = np.array(all_histories)
     mean_history  = history_array.mean(axis=0)
     std_history   = history_array.std(axis=0)
-    iterations    = range(1, 101)
+    iterations    = range(1, CONVERGENCE_MAX_ITER + 1)
 
     # Plot individual runs faintly
     for h in all_histories:
@@ -73,18 +78,18 @@ def plot_convergence(ax, num_runs=10):
                color='green', linestyle='--', linewidth=1.5,
                label='Optimal fitness (VM3)')
 
-    ax.set_xlabel('Iteration', fontsize=11)
+    ax.set_xlabel(f'Iteration (MaxIter={CONVERGENCE_MAX_ITER})', fontsize=11)
     ax.set_ylabel('Best Fitness Score', fontsize=11)
     ax.set_title('AVRO Convergence Across Multiple Runs', fontsize=13)
     ax.legend(fontsize=9)
 
 
-def plot_vm_selection_distribution(ax, num_tasks=200):
+def plot_vm_selection_distribution(ax, num_tasks=300):
     """
     Plot 2 — VM selection distribution: AVRO vs Round Robin.
     Shows AVRO intelligence vs RR blindness.
     """
-    avro = AVROScheduler(pop_size=10, max_iter=100)
+    avro = AVROScheduler(pop_size=10, max_iter=300)
     rr   = RoundRobinScheduler(num_vms=4)
 
     avro_counts = {i: 0 for i in range(4)}
@@ -151,7 +156,10 @@ def plot_fitness_comparison(ax, num_tasks=100):
     Plot 3 — Cumulative average fitness over sequential tasks.
     Shows AVRO consistently outperforms RR over time.
     """
-    avro = AVROScheduler(pop_size=10, max_iter=100)
+    avro = AVROScheduler(
+        pop_size=10,
+        max_iter=CONVERGENCE_MAX_ITER,
+    )
     rr   = RoundRobinScheduler(num_vms=4)
 
     avro_cumulative = []

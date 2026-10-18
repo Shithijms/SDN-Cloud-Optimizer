@@ -37,10 +37,14 @@ class AVROScheduler:
     def __init__(self,
                  pop_size=POP_SIZE,
                  max_iter=MAX_ITER,
-                 t_train=T_TRAIN):
+                 t_train=T_TRAIN,
+                 threshold=0.3):
         self.pop_size = pop_size
         self.max_iter = max_iter
         self.t_train  = t_train
+        self.threshold = threshold
+        self.selection_count = 0
+        self.fast_path_count = 0
 
     # ────────────────────────────────────────────────────────────
     # STAGE 1A — Population Initialization
@@ -323,7 +327,7 @@ class AVROScheduler:
     
     def _fast_select(self,
                      vm_stats_list: list,
-                     threshold: float = 0.3) -> int or None:
+                     threshold: float) -> int or None:
         """
         Fast path using relative fitness scoring.
         Handles saturated scenarios where all VMs are overloaded.
@@ -375,12 +379,17 @@ class AVROScheduler:
 
         if num_vms == 0:
             raise ValueError("vm_stats_list cannot be empty")
+        if not track_convergence:
+            self.selection_count += 1
         if num_vms == 1:
+            if not track_convergence:
+                self.fast_path_count += 1
             return (0, []) if track_convergence else 0
         
         if not track_convergence:
-            fast_result = self._fast_select(vm_stats_list)
+            fast_result = self._fast_select(vm_stats_list, self.threshold)
             if fast_result is not None:
+                self.fast_path_count += 1
                 return fast_result
 
          # Fast path 2 — all VMs saturated
@@ -388,6 +397,7 @@ class AVROScheduler:
             all_saturated = all(
                 vm['cpu'] > 0.80 for vm in vm_stats_list)
             if all_saturated:
+                self.fast_path_count += 1
                 return min(
                     range(num_vms),
                     key=lambda i: (
