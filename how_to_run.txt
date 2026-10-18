@@ -20,7 +20,7 @@ STEP 2 - Terminal 1: start Ryu
 ------------------------------
 
     cd ~/SDN-Cloud-Optimizer
-    .venv/bin/ryu-manager cloud-sdn-avro/controller/cloud_contoller.py --ofp-tcp-listen-port 6633
+    cloud-sdn-avro/controller/cloud_contoller.py --ofp-tcp-listen-port 6633
 
 Wait for:
 
@@ -77,7 +77,7 @@ STEP 6 - Terminal 5: start the integration client
 --------------------------------------------------
 
     cd ~/SDN-Cloud-Optimizer
-    .venv/bin/python avro_integration_client.py
+    .venv/bin/python integration/avro_integration_client.py
 
 Wait for:
 
